@@ -45,17 +45,17 @@ Controller::Controller(std::shared_ptr<mc_rbdyn::RobotModule> robotModule,
   auto planConfig = config("plans")(controlRobot().name());
 
   mc_rtc::log::info("Loading default stabilizer configuration");
-  auto stabiConfig = robot().module().defaultLIPMStabilizerConfiguration();
+  stabiConfig_ = robot().module().defaultLIPMStabilizerConfiguration();
   if(robotConfig.has("stabilizer"))
   {
     mc_rtc::log::info("Loading additional stabilizer configuration:\n{}", robotConfig("stabilizer").dump(true));
-    stabiConfig.load(robotConfig("stabilizer"));
-    mc_rtc::log::info("Stabi prop {}", stabiConfig.dcmPropGain);
+    stabiConfig_.load(robotConfig("stabilizer"));
+    mc_rtc::log::info("Stabi prop {}", stabiConfig_.dcmPropGain);
   }
 
   // Patch CoM height and step width in all plans
   std::vector<std::string> plans = planConfig.keys();
-  double comHeight = stabiConfig.comHeight;
+  double comHeight = stabiConfig_.comHeight;
   for(const auto & p : plans)
   {
     auto plan = planConfig(p);
@@ -102,9 +102,9 @@ Controller::Controller(std::shared_ptr<mc_rbdyn::RobotModule> robotModule,
   // - Additional configuration from the configuration, in section robot_models/robot_name/stabilizer
   // ====================
   stabilizer_.reset(new mc_tasks::lipm_stabilizer::StabilizerTask(
-      solver().robots(), solver().realRobots(), robot().robotIndex(), stabiConfig.leftFootSurface,
-      stabiConfig.rightFootSurface, stabiConfig.torsoBodyName, solver().dt()));
-  stabilizer_->configure(stabiConfig);
+      solver().robots(), solver().realRobots(), robot().robotIndex(), stabiConfig_.leftFootSurface,
+      stabiConfig_.rightFootSurface, stabiConfig_.torsoBodyName, solver().dt()));
+  stabilizer_->configure(stabiConfig_);
 
   // Read footstep plans from configuration
   planInterpolator.configure(planConfig);
@@ -251,6 +251,7 @@ void Controller::reset(const mc_control::ControllerResetData & data)
   mc_control::fsm::Controller::reset(data);
 
   stabilizer_->reset();
+  stabilizer_->configure(stabiConfig_);
   setContacts({{ContactState::Left, supportContact().pose}, {ContactState::Right, targetContact().pose}}, true);
 
   if(gui_)
