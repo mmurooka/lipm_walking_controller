@@ -60,10 +60,10 @@ robot_models:
       friction: 0.7
     torso:
       pitch: 0.0
-    stabilizer:
-      dcm_tracking:
-        gains:
-          integral: 0.0
+    # stabilizer:
+    #   dcm_tracking:
+    #     gains:
+    #       integral: 0.0
   jvrc1:
     sole:
       half_length: 0.11

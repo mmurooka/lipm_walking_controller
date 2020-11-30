@@ -94,7 +94,7 @@ void states::RunStabilizer::runState()
       reach_phase_ = 2;
       break;
     case 2:
-      if (left_admit_task_->eval().norm() < 1e-2 && right_admit_task_->eval().norm() < 1e-2) {
+      if (left_admit_task_->speed().norm() < 1e-2 && right_admit_task_->speed().norm() < 1e-2) {
         reach_phase_ = 3;
       }
       break;
