@@ -9,30 +9,43 @@ namespace lipm_walking
 
 void states::RunStabilizer::start()
 {
+  // add stabilizer task
   auto & ctl = controller();
   ctl.solver().addTask(stabilizer());
   stabilizer()->setApplyComOffset(true);
 
-  // add end-effector task
-  left_hand_task_ = std::make_shared<mc_tasks::EndEffectorTask>(
-      "Lhand_Link0_Plan2", Eigen::Vector3d(0, 0, -0.14),
-      ctl.robots(), 0, 5.0, 500.0);
-  ctl.solver().addTask(left_hand_task_);
-  left_hand_task_->reset();
-  right_hand_task_ = std::make_shared<mc_tasks::EndEffectorTask>(
-      "Rhand_Link0_Plan2", Eigen::Vector3d(0, 0, -0.14),
-      ctl.robots(), 0, 5.0, 500.0);
-  ctl.solver().addTask(right_hand_task_);
-  right_hand_task_->reset();
-
-  // initialize with the nominal CoM
-  target_com_ = ctl.robot().com();
-  current_com_ = target_com_;
+  // add admittance task
+  left_admit_task_ = std::make_shared<mc_tasks::force::AdmittanceTask>(
+      "LeftHand",
+      ctl.robots(),
+      ctl.robot().robotIndex());
+  ctl.solver().addTask(left_admit_task_);
+  left_admit_task_->reset();
+  left_admit_task_->admittance(sva::ForceVecd::Zero());
+  right_admit_task_ = std::make_shared<mc_tasks::force::AdmittanceTask>(
+      "RightHand",
+      ctl.robots(),
+      ctl.robot().robotIndex());
+  ctl.solver().addTask(right_admit_task_);
+  right_admit_task_->reset();
+  right_admit_task_->admittance(sva::ForceVecd::Zero());
 
   // initialize external wrenches
   ext_wrenches_.resize(2);
   ext_wrenches_[0].second = sva::ForceVecd::Zero();
   ext_wrenches_[1].second = sva::ForceVecd::Zero();
+
+  // make contact instance
+  Eigen::Vector6d hand_contact_dof = Eigen::Vector6d::Ones();
+  hand_contact_dof[5] = 0;
+  left_hand_contact_ = mc_control::fsm::Contact(
+      "hrp5_p", "ground", "LeftHand", "AllGround",
+      mc_rbdyn::Contact::defaultFriction,
+      hand_contact_dof);
+  right_hand_contact_ = mc_control::fsm::Contact(
+      "hrp5_p", "ground", "RightHand", "AllGround",
+      mc_rbdyn::Contact::defaultFriction,
+      hand_contact_dof);
 
   // close gripper
   for (auto & g : ctl.robot().grippers()) {
@@ -53,11 +66,6 @@ void states::RunStabilizer::runState()
   double dt = ctl.timeStep;
 
   // calculate the current value by interpolating the target value
-  current_com_ +=
-      (target_com_ - current_com_).cwiseMax(
-          -1 * dt * com_vel_limit_).cwiseMin(
-              dt * com_vel_limit_);
-
   current_left_hand_force_ +=
       (target_left_hand_force_ - current_left_hand_force_).cwiseMax(
           -1 * dt * hand_force_rate_limit_).cwiseMin(
@@ -67,42 +75,53 @@ void states::RunStabilizer::runState()
           -1 * dt * hand_force_rate_limit_).cwiseMin(
               dt * hand_force_rate_limit_);
 
-  // calculate the target CoM
-  if (first_) {
-    prev_com_ = current_com_;
-    prev_com_vel_.setZero();
-  }
-  Eigen::Vector3d com_vel = (current_com_ - prev_com_) / dt;
-  Eigen::Vector3d com_acc = (com_vel - prev_com_vel_) / dt;
-  prev_com_ = current_com_;
-  prev_com_vel_ = com_vel;
-
   // update the external wrenches
-  ext_wrenches_[0].first = left_hand_task_->get_ef_pose().translation();
+  ext_wrenches_[0].first = left_admit_task_->surfacePose().translation();
   ext_wrenches_[0].second.force() = current_left_hand_force_;
-  ext_wrenches_[1].first = right_hand_task_->get_ef_pose().translation();
+  ext_wrenches_[1].first = right_admit_task_->surfacePose().translation();
   ext_wrenches_[1].second.force() = current_right_hand_force_;
   stabilizer()->setExtWrenches(ext_wrenches_);
+  left_admit_task_->targetWrenchW(ext_wrenches_[0].second);
+  right_admit_task_->targetWrenchW(ext_wrenches_[1].second);
 
-  // update the target of the end-effector tasks
+  // update the target pose of the admittance tasks
   switch (reach_phase_) {
     case 1:
-      left_hand_task_->set_ef_pose(
+      left_admit_task_->targetPose(
           sva::PTransformd{sva::RotY(-M_PI/2), Eigen::Vector3d{0.3, 0.5, 1.0}});
-      right_hand_task_->set_ef_pose(
+      right_admit_task_->targetPose(
           sva::PTransformd{sva::RotY(-M_PI/2), Eigen::Vector3d{0.3, -0.5, 1.0}});
       reach_phase_ = 2;
       break;
     case 2:
-      if (left_hand_task_->speed().norm() < 2e-3 && right_hand_task_->speed().norm() < 2e-3) {
+      if (left_admit_task_->eval().norm() < 1e-2 && right_admit_task_->eval().norm() < 1e-2) {
         reach_phase_ = 3;
       }
       break;
     case 3:
-      left_hand_task_->set_ef_pose(
+      left_admit_task_->targetPose(
           sva::PTransformd{sva::RotY(-M_PI/2), Eigen::Vector3d{0.6, 0.5, 1.0}});
-      right_hand_task_->set_ef_pose(
+      right_admit_task_->targetPose(
           sva::PTransformd{sva::RotY(-M_PI/2), Eigen::Vector3d{0.6, -0.5, 1.0}});
+      reach_phase_ = 4;
+      break;
+    case 4:
+      if (left_admit_task_->eval().norm() < 1e-2 && right_admit_task_->eval().norm() < 1e-2) {
+        reach_phase_ = 5;
+      }
+      break;
+    case 5:
+      // enable admittance to the z direction
+      sva::ForceVecd admit_gain(Eigen::Vector3d::Zero(), {0, 0, 0.01});
+      sva::MotionVecd admit_stiffness({1., 1., 1.}, {1., 1., 1.});
+      sva::MotionVecd admit_damping({1., 1., 1.}, {1., 1., 100.});
+      left_admit_task_->admittance(admit_gain);
+      left_admit_task_->stiffness(admit_stiffness);
+      left_admit_task_->damping(admit_damping);
+      right_admit_task_->admittance(admit_gain);
+      right_admit_task_->stiffness(admit_stiffness);
+      right_admit_task_->damping(admit_damping);
+
       reach_phase_ = 0;
       break;
   }
@@ -174,7 +193,8 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
           [this]() { return hand_force_rate_limit_; },
           [this](double v) {
             hand_force_rate_limit_ = v;
-            mc_rtc::log::info("hand_force_rate_limit is changed to {}.", hand_force_rate_limit_);
+            mc_rtc::log::info("hand_force_rate_limit is changed to {}.",
+                              hand_force_rate_limit_);
           }));
 
   ctl.gui()->addElement(
@@ -212,18 +232,6 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
             target_right_hand_force_ = v;
             mc_rtc::log::info("right_hand_force is changed to {}.",
                               target_right_hand_force_.transpose());
-          }));
-
-  ctl.gui()->addElement(
-      {"HandForceTest", "CoM"},
-      mc_rtc::gui::ArrayInput(
-          "Nominal CoM",
-          {"x", "y", "z"},
-          [this]() { return target_com_; },
-          [this](const Eigen::Vector3d& v) {
-            target_com_ = v;
-            mc_rtc::log::info("nominal_com is changed to {}.",
-                              target_com_.transpose());
           }));
 }
 
