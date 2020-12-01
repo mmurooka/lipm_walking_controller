@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <cmath>
+
 #include <lipm_walking/Controller.h>
 #include <lipm_walking/State.h>
 
@@ -36,6 +38,24 @@ struct RunStabilizer : State
   void setupLogger(mc_control::fsm::Controller & ctl);
 
   void setupGui(mc_control::fsm::Controller & ctl);
+
+  inline sva::PTransformd projGround(const sva::PTransformd& pose) const
+  {
+    Eigen::Vector3d pos = pose.translation();
+    pos[2] = 0;
+    return sva::PTransformd(
+        sva::RotZ(std::acos(Eigen::Vector3d::UnitX().dot(
+            pose.rotation() * Eigen::Vector3d::UnitX()))),
+        pos);
+  }
+
+  inline sva::PTransformd footMidpose(mc_control::fsm::Controller & ctl) const
+  {
+    return sva::interpolate(
+        projGround(ctl.robot().surfacePose("LeftFoot")),
+        projGround(ctl.robot().surfacePose("RightFoot")),
+        0.5);
+  }
 
   std::shared_ptr<mc_tasks::force::AdmittanceTask> left_admit_task_;
   std::shared_ptr<mc_tasks::force::AdmittanceTask> right_admit_task_;

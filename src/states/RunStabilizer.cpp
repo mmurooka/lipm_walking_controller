@@ -139,17 +139,34 @@ void states::RunStabilizer::runState()
       break;
     case 5:
       // enable admittance to the z direction
-      sva::ForceVecd admit_gain(Eigen::Vector3d::Zero(), {0, 0, 0.01});
-      sva::MotionVecd admit_stiffness({1., 1., 1.}, {1., 1., 1.});
-      sva::MotionVecd admit_damping({1., 1., 1.}, {1., 1., 100.});
-      left_admit_task_->admittance(admit_gain);
-      left_admit_task_->stiffness(admit_stiffness);
-      left_admit_task_->damping(admit_damping);
-      right_admit_task_->admittance(admit_gain);
-      right_admit_task_->stiffness(admit_stiffness);
-      right_admit_task_->damping(admit_damping);
+      {
+        sva::ForceVecd admit_gain(Eigen::Vector3d::Zero(), {0, 0, 0.01});
+        sva::MotionVecd admit_stiffness({1., 1., 1.}, {1., 1., 1.});
+        sva::MotionVecd admit_damping({1., 1., 1.}, {1., 1., 100.});
+        left_admit_task_->admittance(admit_gain);
+        left_admit_task_->stiffness(admit_stiffness);
+        left_admit_task_->damping(admit_damping);
+        right_admit_task_->admittance(admit_gain);
+        right_admit_task_->stiffness(admit_stiffness);
+        right_admit_task_->damping(admit_damping);
+      }
 
-      reach_phase_ = 0;
+      // save target pose relative to foot midpose
+      {
+        sva::PTransformd foot_midpose = footMidpose(ctl);
+        rel_target_poses_ = {
+          left_admit_task_->targetPose() * foot_midpose.inv(),
+          right_admit_task_->targetPose() * foot_midpose.inv()};
+      }
+
+      reach_phase_ = 6;
+      break;
+    case 6:
+      {
+        sva::PTransformd foot_midpose = footMidpose(ctl);
+        left_admit_task_->targetPose(rel_target_poses_[0] * foot_midpose);
+        right_admit_task_->targetPose(rel_target_poses_[1] * foot_midpose);
+      }
       break;
   }
 }
