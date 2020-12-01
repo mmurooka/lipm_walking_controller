@@ -7,6 +7,9 @@
 #include <lipm_walking/Controller.h>
 #include <lipm_walking/State.h>
 
+#include <mc_rtc/ros.h>
+#include <ros/ros.h>
+
 namespace lipm_walking
 {
 
@@ -21,6 +24,8 @@ namespace states
  */
 struct RunStabilizer : State
 {
+  RunStabilizer();
+
   void start() override;
   void teardown() override;
   void runState() override;
@@ -50,6 +55,11 @@ struct RunStabilizer : State
 
   mc_control::fsm::Contact left_hand_contact_;
   mc_control::fsm::Contact right_hand_contact_;
+
+  std::shared_ptr<ros::NodeHandle> nh_;
+  ros::Publisher ext_force_pub_;
+
+  std::vector<sva::PTransformd> rel_target_poses_;
 };
 
 } // namespace states

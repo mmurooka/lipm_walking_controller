@@ -30,4 +30,14 @@ add_fsm_state_simple(Standing)
 add_fsm_state_simple(DoubleSupport)
 add_fsm_state_simple(SingleSupport)
 
+find_package(eigen_conversions REQUIRED)
+find_package(hwm_msgs REQUIRED)
+
 add_fsm_state_simple(RunStabilizer)
+target_include_directories(RunStabilizer PUBLIC
+  ${eigen_conversions_INCLUDE_DIRS}
+  ${hwm_msgs_INCLUDE_DIRS})
+target_link_libraries(RunStabilizer PUBLIC
+  mc_rtc::mc_rtc_ros
+  ${eigen_conversions_LIBRARIES}
+  ${hwm_msgs_LIBRARIES})

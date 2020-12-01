@@ -2,10 +2,20 @@
  * Copyright (c) 2020, CNRS-UM LIRMM, CNRS-AIST JRL
  */
 
+#include <eigen_conversions/eigen_msg.h>
+#include <hwm_msgs/CnoidExternalForceArray.h>
+
 #include "RunStabilizer.h"
 
 namespace lipm_walking
 {
+
+states::RunStabilizer::RunStabilizer():
+    nh_(mc_rtc::ROSBridge::get_node_handle())
+{
+  ext_force_pub_ = nh_->advertise<hwm_msgs::CnoidExternalForceArray>(
+      "cnoid_external_force", 1, true);
+}
 
 void states::RunStabilizer::start()
 {
@@ -83,6 +93,23 @@ void states::RunStabilizer::runState()
   stabilizer()->setExtWrenches(ext_wrenches_);
   left_admit_task_->targetWrenchW(ext_wrenches_[0].second);
   right_admit_task_->targetWrenchW(ext_wrenches_[1].second);
+
+  // publish the external wrenches to the choreonoid
+  hwm_msgs::CnoidExternalForceArray ext_force_arr_msg;
+  std::vector<std::string> hand_link_names = {"LHDY", "RHDY"};
+  std::vector<std::shared_ptr<mc_tasks::force::AdmittanceTask> > admit_tasks =
+      {left_admit_task_, right_admit_task_};
+  for (auto i : {0, 1}) {
+    hwm_msgs::CnoidExternalForce ext_force_msg;
+    ext_force_msg.tm = ros::Duration(100.0);
+    ext_force_msg.robot = "HRP5P";
+    ext_force_msg.link = hand_link_names[i];
+    // ext_force_msg.link = ctl.robot().surface(admit_tasks[i]).bodyName();
+    tf::pointEigenToMsg(Eigen::Vector3d::Zero(), ext_force_msg.position);
+    tf::vectorEigenToMsg(ext_wrenches_[i].second.force(), ext_force_msg.force);
+    ext_force_arr_msg.forces.push_back(ext_force_msg);
+  }
+  ext_force_pub_.publish(ext_force_arr_msg);
 
   // update the target pose of the admittance tasks
   switch (reach_phase_) {
