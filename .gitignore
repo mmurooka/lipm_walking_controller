@@ -3,3 +3,8 @@ wiki/
 build/
 compile_commands.json
 .vscode/
+
+*~
+GPATH
+GRTAGS
+GTAGS
