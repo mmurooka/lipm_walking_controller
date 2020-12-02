@@ -139,7 +139,7 @@ void states::RunStabilizer::runState()
       break;
     case 5:
       // enable admittance to the z direction
-      {
+      if (ctl.config()("RunStabilizerConfig")("EnableAdmittance")) {
         sva::ForceVecd admit_gain(Eigen::Vector3d::Zero(), {0, 0, 0.01});
         sva::MotionVecd admit_stiffness({1., 1., 1.}, {1., 1., 1.});
         sva::MotionVecd admit_damping({1., 1., 1.}, {1., 1., 100.});

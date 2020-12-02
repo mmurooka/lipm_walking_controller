@@ -1130,3 +1130,6 @@ ObserverPipelines:
           maxAnchorFrameDiscontinuity: 0.02
     - type: BodySensor
       update: false
+
+RunStabilizerConfig:
+  EnableAdmittance: true
