@@ -195,12 +195,12 @@ void states::RunStabilizer::setupLogger(mc_control::fsm::Controller & ctl)
   ctl.logger().addLogEntry("HandForceTest_MeasuredWrench_LeftHand",
                            [&ctl]() -> const sva::ForceVecd
                            { return ctl.robot().forceSensor(
-                               "LeftHandForceSensor").worldWrench(ctl.robot()); });
+                               "LeftHandForceSensor").worldWrenchWithoutGravity(ctl.robot()); });
 
   ctl.logger().addLogEntry("HandForceTest_MeasuredWrench_RightHand",
                            [&ctl]() -> const sva::ForceVecd
                            { return ctl.robot().forceSensor(
-                               "RightHandForceSensor").worldWrench(ctl.robot()); });
+                               "RightHandForceSensor").worldWrenchWithoutGravity(ctl.robot()); });
 }
 
 void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
