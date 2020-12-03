@@ -19,8 +19,18 @@ states::RunStabilizer::RunStabilizer():
 
 void states::RunStabilizer::start()
 {
-  // add stabilizer task
   auto & ctl = controller();
+
+  // read configuration
+  if (ctl.config().has("RunStabilizerConfig")) {
+    const auto stabilizer_config = ctl.config()("RunStabilizerConfig");
+    stabilizer_config("EnableAdmittance", enamble_admittance_);
+    stabilizer_config("AdmittanceGain", admit_gain_);
+    stabilizer_config("AdmittanceStiffness", admit_stiffness_);
+    stabilizer_config("AdmittanceDamping", admit_damping_);
+  }
+
+  // add stabilizer task
   ctl.solver().addTask(stabilizer());
   stabilizer()->setApplyComOffset(true);
 
@@ -31,14 +41,12 @@ void states::RunStabilizer::start()
       ctl.robot().robotIndex());
   ctl.solver().addTask(left_admit_task_);
   left_admit_task_->reset();
-  left_admit_task_->admittance(sva::ForceVecd::Zero());
   right_admit_task_ = std::make_shared<mc_tasks::force::AdmittanceTask>(
       "RightHand",
       ctl.robots(),
       ctl.robot().robotIndex());
   ctl.solver().addTask(right_admit_task_);
   right_admit_task_->reset();
-  right_admit_task_->admittance(sva::ForceVecd::Zero());
 
   // initialize external wrenches
   ext_wrenches_.resize(2);
@@ -145,16 +153,13 @@ void states::RunStabilizer::runState()
       break;
     case 5:
       // enable admittance to the z direction
-      if (ctl.config()("RunStabilizerConfig")("EnableAdmittance")) {
-        sva::ForceVecd admit_gain(Eigen::Vector3d::Zero(), {0, 0, 0.01});
-        sva::MotionVecd admit_stiffness({1., 1., 1.}, {1., 1., 1.});
-        sva::MotionVecd admit_damping({1., 1., 1.}, {1., 1., 100.});
-        left_admit_task_->admittance(admit_gain);
-        left_admit_task_->stiffness(admit_stiffness);
-        left_admit_task_->damping(admit_damping);
-        right_admit_task_->admittance(admit_gain);
-        right_admit_task_->stiffness(admit_stiffness);
-        right_admit_task_->damping(admit_damping);
+      if (enamble_admittance_) {
+        left_admit_task_->admittance({Eigen::Vector3d::Zero(), admit_gain_});
+        left_admit_task_->stiffness({{1., 1., 1.}, admit_stiffness_});
+        left_admit_task_->damping({{1., 1., 1.}, admit_damping_});
+        right_admit_task_->admittance({Eigen::Vector3d::Zero(), admit_gain_});
+        right_admit_task_->stiffness({{1., 1., 1.}, admit_stiffness_});
+        right_admit_task_->damping({{1., 1., 1.}, admit_damping_});
       }
 
       // save target pose relative to foot midpose

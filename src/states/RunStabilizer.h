@@ -83,6 +83,11 @@ struct RunStabilizer : State
   ros::Publisher ext_force_pub_;
 
   std::vector<sva::PTransformd> rel_target_poses_;
+
+  bool enamble_admittance_ = true;
+  Eigen::Vector3d admit_gain_ = {0, 0.01, 0.01};
+  Eigen::Vector3d admit_stiffness_ = {1., 1., 10.};
+  Eigen::Vector3d admit_damping_ = {1., 1., 1.};
 };
 
 } // namespace states
