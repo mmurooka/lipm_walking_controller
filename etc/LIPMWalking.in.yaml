@@ -64,12 +64,13 @@ robot_models:
     stabilizer:
       dcm_tracking:
         gains:
-          integral: 0.0
+          # integral: 0.0
+          comdError: 0.0
       ext_wrench:
         # derivator_time_constant: 1.0
         use_measured_value: true
         compensate_error: true
-        compensate_error_d: true
+        compensate_error_d: false # true
   jvrc1:
     sole:
       half_length: 0.11
