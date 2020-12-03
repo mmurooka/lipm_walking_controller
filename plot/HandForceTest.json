@@ -5,7 +5,9 @@
     [
       "lipm_stabilizer_hrp5_p_controlRobot_com_x",
       "lipm_stabilizer_hrp5_p_realRobot_com_x",
-      "lipm_stabilizer_hrp5_p_realRobot_zmp_x"
+      "lipm_stabilizer_hrp5_p_realRobot_zmp_x",
+      "lipm_stabilizer_hrp5_p_support_max_x",
+      "lipm_stabilizer_hrp5_p_support_min_x"
     ],
     [],
     [],
@@ -25,6 +27,13 @@
       "label": ""
     },
     {
+      "lipm_stabilizer_hrp5_p_support_min_x": {
+        "color": "#aaff00",
+        "visible": false,
+        "linewidth": 1.0,
+        "linestyle": "--",
+        "label": "lipm_stabilizer_hrp5_p_support_min_x"
+      },
       "lipm_stabilizer_hrp5_p_controlRobot_com_x": {
         "color": "#0000ff",
         "visible": false,
@@ -38,6 +47,13 @@
         "linewidth": 3.0,
         "linestyle": "-",
         "label": "lipm_stabilizer_hrp5_p_realRobot_zmp_x"
+      },
+      "lipm_stabilizer_hrp5_p_support_max_x": {
+        "color": "#aaff00",
+        "visible": false,
+        "linewidth": 1.0,
+        "linestyle": "--",
+        "label": "lipm_stabilizer_hrp5_p_support_max_x"
       },
       "lipm_stabilizer_hrp5_p_realRobot_com_x": {
         "color": "#ff0000",
@@ -69,16 +85,16 @@
     {
       "legend_fontsize": 10,
       "top_offset": 0.9,
-      "tick_fontsize": 10,
-      "labelpad": 10,
-      "y2_legend_ncol": 3,
       "y1_legend_ncol": 3,
-      "bottom_offset": 0.1
+      "labelpad": 10,
+      "bottom_offset": 0.1,
+      "tick_fontsize": 10,
+      "y2_legend_ncol": 3
     },
     0
   ],
   [
-    "HandForceTest_force",
+    "HandForceTest_fx",
     "t",
     [
       "HandForceTest_MeasuredWrench_LeftHand_fx",
@@ -131,6 +147,92 @@
         "linewidth": 3.0,
         "linestyle": "-",
         "label": "HandForceTest_TargetWrench_RightHand_fx"
+      }
+    },
+    {},
+    {
+      "x_label": {
+        "text": "",
+        "fontsize": 10
+      },
+      "y1_label": {
+        "text": "",
+        "fontsize": 10
+      },
+      "y2_label": {
+        "text": "",
+        "fontsize": 10
+      },
+      "title": {
+        "text": "",
+        "fontsize": 12
+      }
+    },
+    {
+      "legend_fontsize": 10,
+      "top_offset": 0.9,
+      "y1_legend_ncol": 3,
+      "labelpad": 10,
+      "bottom_offset": 0.1,
+      "tick_fontsize": 10,
+      "y2_legend_ncol": 3
+    },
+    0
+  ],
+  [
+    "HandForceTest_fz",
+    "t",
+    [
+      "HandForceTest_MeasuredWrench_LeftHand_fz",
+      "HandForceTest_MeasuredWrench_RightHand_fz",
+      "HandForceTest_TargetWrench_LeftHand_fz",
+      "HandForceTest_TargetWrench_RightHand_fz"
+    ],
+    [],
+    [],
+    [],
+    {
+      "color": "black",
+      "visible": false,
+      "linewidth": 0.5,
+      "linestyle": "--",
+      "label": ""
+    },
+    {
+      "color": "black",
+      "visible": false,
+      "linewidth": 0.5,
+      "linestyle": "--",
+      "label": ""
+    },
+    {
+      "HandForceTest_MeasuredWrench_LeftHand_fz": {
+        "color": "#ff0000",
+        "visible": false,
+        "linewidth": 3.0,
+        "linestyle": "-",
+        "label": "HandForceTest_MeasuredWrench_LeftHand_fz"
+      },
+      "HandForceTest_MeasuredWrench_RightHand_fz": {
+        "color": "#0000ff",
+        "visible": false,
+        "linewidth": 3.0,
+        "linestyle": "-",
+        "label": "HandForceTest_MeasuredWrench_RightHand_fz"
+      },
+      "HandForceTest_TargetWrench_LeftHand_fz": {
+        "color": "#ffaa00",
+        "visible": false,
+        "linewidth": 3.0,
+        "linestyle": "-",
+        "label": "HandForceTest_TargetWrench_LeftHand_fz"
+      },
+      "HandForceTest_TargetWrench_RightHand_fz": {
+        "color": "#55ffff",
+        "visible": false,
+        "linewidth": 3.0,
+        "linestyle": "-",
+        "label": "HandForceTest_TargetWrench_RightHand_fz"
       }
     },
     {},
