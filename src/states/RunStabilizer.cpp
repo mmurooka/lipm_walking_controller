@@ -85,6 +85,11 @@ void states::RunStabilizer::runState()
           -1 * dt * hand_force_rate_limit_).cwiseMin(
               dt * hand_force_rate_limit_);
 
+  current_cnoid_ext_force_offset_ +=
+      (target_cnoid_ext_force_offset_ - current_cnoid_ext_force_offset_).cwiseMax(
+          -1 * dt * hand_force_rate_limit_).cwiseMin(
+              dt * hand_force_rate_limit_);
+
   // update the external wrenches
   ext_wrenches_[0].first = left_admit_task_->surfacePose().translation();
   ext_wrenches_[0].second.force() = current_left_hand_force_;
@@ -106,7 +111,8 @@ void states::RunStabilizer::runState()
     ext_force_msg.link = hand_link_names[i];
     // ext_force_msg.link = ctl.robot().surface(admit_tasks[i]).bodyName();
     tf::pointEigenToMsg(Eigen::Vector3d::Zero(), ext_force_msg.position);
-    tf::vectorEigenToMsg(ext_wrenches_[i].second.force(), ext_force_msg.force);
+    tf::vectorEigenToMsg(
+        ext_wrenches_[i].second.force() + current_cnoid_ext_force_offset_, ext_force_msg.force);
     ext_force_arr_msg.forces.push_back(ext_force_msg);
   }
   ext_force_pub_.publish(ext_force_arr_msg);
@@ -215,22 +221,6 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
   //         }));
 
   ctl.gui()->addElement(
-      {"HandForceTest", "Contact"},
-      mc_rtc::gui::Button(
-          "Add contacts of both hands", [this, &ctl]() {
-            ctl.addContact(left_hand_contact_);
-            ctl.addContact(right_hand_contact_);
-          }));
-
-  ctl.gui()->addElement(
-      {"HandForceTest", "Contact"},
-      mc_rtc::gui::Button(
-          "Remove contacts of both hands", [this, &ctl]() {
-            ctl.removeContact(left_hand_contact_);
-            ctl.removeContact(right_hand_contact_);
-          }));
-
-  ctl.gui()->addElement(
       {"HandForceTest", "Force"},
       mc_rtc::gui::NumberInput(
           "Hand force rate limit",
@@ -276,6 +266,34 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
             target_right_hand_force_ = v;
             mc_rtc::log::info("right_hand_force is changed to {}.",
                               target_right_hand_force_.transpose());
+          }));
+
+  ctl.gui()->addElement(
+      {"HandForceTest", "Force"},
+      mc_rtc::gui::ArrayInput(
+          "Cnoid external force offset",
+          {"x", "y", "z"},
+          [this]() -> const Eigen::Vector3d { return target_cnoid_ext_force_offset_; },
+          [this](const Eigen::Vector3d& v) {
+            target_cnoid_ext_force_offset_ = v;
+            mc_rtc::log::info("cnoid_ext_force_offset is changed to {}.",
+                              target_cnoid_ext_force_offset_.transpose());
+          }));
+
+  ctl.gui()->addElement(
+      {"HandForceTest", "Contact"},
+      mc_rtc::gui::Button(
+          "Add contacts of both hands", [this, &ctl]() {
+            ctl.addContact(left_hand_contact_);
+            ctl.addContact(right_hand_contact_);
+          }));
+
+  ctl.gui()->addElement(
+      {"HandForceTest", "Contact"},
+      mc_rtc::gui::Button(
+          "Remove contacts of both hands", [this, &ctl]() {
+            ctl.removeContact(left_hand_contact_);
+            ctl.removeContact(right_hand_contact_);
           }));
 }
 

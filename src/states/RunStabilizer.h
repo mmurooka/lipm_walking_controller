@@ -69,6 +69,9 @@ struct RunStabilizer : State
 
   std::vector<std::pair<Eigen::Vector3d, sva::ForceVecd> > ext_wrenches_;
 
+  Eigen::Vector3d target_cnoid_ext_force_offset_ = Eigen::Vector3d::Zero();
+  Eigen::Vector3d current_cnoid_ext_force_offset_ = Eigen::Vector3d::Zero();
+
   double first_ = true;
 
   double hand_force_rate_limit_ = 50;
