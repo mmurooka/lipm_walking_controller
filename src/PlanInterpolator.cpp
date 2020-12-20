@@ -144,8 +144,8 @@ void PlanInterpolator::updateWorldTarget_(const Eigen::Vector3d & desired)
 
 void PlanInterpolator::updateLocalTarget_(const SE2d & target)
 {
-  targetPose_.x = floorn(clamp(target.pos().x(), -5., 5.), 4);
-  targetPose_.y = floorn(clamp(target.pos().y(), -5., 5.), 4);
+  targetPose_.x = floorn(clamp(target.pos().x(), -10., 10.), 4);
+  targetPose_.y = floorn(clamp(target.pos().y(), -10., 10.), 4);
   targetPose_.theta = floorn(clamp(target.theta, -M_PI, M_PI), 4);
   suggestGait();
 }
