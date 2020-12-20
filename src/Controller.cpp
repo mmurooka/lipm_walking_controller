@@ -116,12 +116,12 @@ Controller::Controller(std::shared_ptr<mc_rbdyn::RobotModule> robotModule,
       solver().robots(),
       solver().realRobots(),
       robot().robotIndex(),
-      stabiConfig.leftFootSurface,
-      stabiConfig.rightFootSurface,
-      stabiConfig.torsoBodyName,
+      stabiConfig_.leftFootSurface,
+      stabiConfig_.rightFootSurface,
+      stabiConfig_.torsoBodyName,
       solver().dt()));
   // clang-format on
-  stabilizer_->configure(stabiConfig);
+  stabilizer_->configure(stabiConfig_);
 
   // Read footstep plans from configuration
   planInterpolator.configure(planConfig);
