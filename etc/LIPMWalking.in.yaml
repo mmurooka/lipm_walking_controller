@@ -64,7 +64,7 @@ robot_models:
     stabilizer:
       dcm_tracking:
         gains:
-          # integral: 0.0
+          integral: 0.0
           comdError: 0.0
       ext_wrench:
         # derivator_time_constant: 1.0
