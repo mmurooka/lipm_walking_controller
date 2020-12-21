@@ -28,7 +28,7 @@ cmake_minimum_required(VERSION 3.1)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 14)
 
-set(PROJECT_NAME lipm_walking_controller)
+set(PROJECT_NAME lipm_walking_controller_ext_wrench)
 set(PROJECT_DESCRIPTION "Walking controller based on linear inverted pendulum tracking")
 set(PROJECT_URL https://github.com/stephane-caron/lipm_walking_controller/)
 set(PROJECT_VERSION 1.6.0)

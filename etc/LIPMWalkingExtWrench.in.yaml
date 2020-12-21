@@ -1114,7 +1114,7 @@ StatesFiles:
 - "@MC_STATES_DEFAULT_INSTALL_PREFIX@/data"
 StatesLibraries:
 - "@MC_STATES_DEFAULT_INSTALL_PREFIX@"
-- "@MC_CONTROLLER_INSTALL_PREFIX@/lipm_walking_controller/states"
+- "@MC_CONTROLLER_INSTALL_PREFIX@/lipm_walking_controller_ext_wrench/states"
 Managed: false
 StepByStep: false
 autoplay: false # true

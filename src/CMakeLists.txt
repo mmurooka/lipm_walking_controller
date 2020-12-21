@@ -54,7 +54,7 @@ set_target_properties(${PROJECT_NAME}_controller PROPERTIES OUTPUT_NAME "${PROJE
 target_link_libraries(${PROJECT_NAME}_controller PUBLIC ${PROJECT_NAME})
 
 set(AROBASE "@")
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/../etc/LIPMWalking.in.yaml" "${CMAKE_CURRENT_BINARY_DIR}/etc/LIPMWalking.yaml")
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/etc/LIPMWalking.yaml" DESTINATION "${MC_RTC_LIBDIR}/mc_controller/etc/")
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/../etc/LIPMWalkingExtWrench.in.yaml" "${CMAKE_CURRENT_BINARY_DIR}/etc/LIPMWalkingExtWrench.yaml")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/etc/LIPMWalkingExtWrench.yaml" DESTINATION "${MC_RTC_LIBDIR}/mc_controller/etc/")
 
 add_subdirectory(states)
