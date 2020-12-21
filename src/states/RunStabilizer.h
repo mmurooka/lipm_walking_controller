@@ -63,11 +63,19 @@ struct RunStabilizer : State
       case Phase::ReachTargetWait:
         return "Phase::ReachTargetWait";
       case Phase::Grasp:
-        return "Phase::Grasp";
+        if (grasp_) {
+          return "Phase::Grasp";
+        } else {
+          return "Phase::Grasp (disabled)";
+        }
       case Phase::Hold:
         return "Phase::Hold";
       case Phase::Ungrasp:
-        return "Phase::Ungrasp";
+        if (grasp_) {
+          return "Phase::Ungrasp";
+        } else {
+          return "Phase::Ungrasp (disabled)";
+        }
       case Phase::ReleaseWayPointInit:
         return "Phase::ReleaseWayPointInit";
       case Phase::ReleaseWayPointWait:

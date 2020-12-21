@@ -91,9 +91,12 @@ void states::RunStabilizer::start()
     }
   }
 
-  // open gripper
   for (auto & g : ctl.robot().grippers()) {
+    // update gripper parameter
     g.get().percentVMAX(0.6);
+    g.get().releaseSafetyOffset(mc_rtc::constants::toRad(0));
+    g.get().actualCommandDiffTrigger(mc_rtc::constants::toRad(3));
+    // open gripper
     g.get().setTargetOpening(1.0);
   }
 
@@ -224,6 +227,12 @@ void states::RunStabilizer::runState()
       for (auto arm : BOTH_ARMS) {
         imp_tasks_.at(arm)->weight(0);
       }
+
+      // close gripper
+      for (auto & g : ctl.robot().grippers()) {
+        g.get().setTargetOpening(0.0);
+      }
+
       goToNextPhase();
       break;
     case Phase::End:
