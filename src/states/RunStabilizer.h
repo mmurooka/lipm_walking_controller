@@ -5,39 +5,120 @@
 #pragma once
 
 #include <cmath>
+#include <unordered_map>
 
 #include <lipm_walking/Controller.h>
 #include <lipm_walking/State.h>
 
 #include <mc_rtc/ros.h>
+#include <mc_tasks/ImpedanceTask.h>
 #include <ros/ros.h>
 
 namespace lipm_walking
 {
 
-/** States of the controller's finite state machine.
- *
- */
 namespace states
 {
 
-/**
- * Adds/removes the global stabilizer task to the QP
- */
+/** \brief Adds/removes the StabilizerTask and ImpedanceTask to the solver. Set external wrenches. */
 struct RunStabilizer : State
 {
+ public:
+  /** \brief Left/right arm */
+  enum class Arm
+  {
+    Left,
+    Right
+  };
+  // both arms
+  const std::vector<Arm> BOTH_ARMS = {Arm::Left, Arm::Right};
+
+  /** \brief Phase */
+  enum class Phase
+  {
+    StandBy,
+    ReachWayPointInit,
+    ReachWayPointWait,
+    ReachTargetInit,
+    ReachTargetWait,
+    Grasp,
+    Hold,
+    Ungrasp,
+    ReleaseWayPointInit,
+    ReleaseWayPointWait,
+    NominalPosture,
+    End
+  };
+  std::string toString(Phase phase) const
+  {
+    switch (phase) {
+      case Phase::StandBy:
+        return "Phase::StandBy";
+      case Phase::ReachWayPointInit:
+        return "Phase::ReachWayPointInit";
+      case Phase::ReachWayPointWait:
+        return "Phase::ReachWayPointWait";
+      case Phase::ReachTargetInit:
+        return "Phase::ReachTargetInit";
+      case Phase::ReachTargetWait:
+        return "Phase::ReachTargetWait";
+      case Phase::Grasp:
+        return "Phase::Grasp";
+      case Phase::Hold:
+        return "Phase::Hold";
+      case Phase::Ungrasp:
+        return "Phase::Ungrasp";
+      case Phase::ReleaseWayPointInit:
+        return "Phase::ReleaseWayPointInit";
+      case Phase::ReleaseWayPointWait:
+        return "Phase::ReleaseWayPointWait";
+      case Phase::NominalPosture:
+        return "Phase::NominalPosture";
+      case Phase::End:
+        return "Phase::End";
+    }
+    return "Phase::Unknown";
+  }
+
   RunStabilizer();
 
   void start() override;
   void teardown() override;
   void runState() override;
-  /// Always true
   bool checkTransitions() override;
 
- private:
+ protected:
   void setupLogger(mc_control::fsm::Controller & ctl);
 
   void setupGui(mc_control::fsm::Controller & ctl);
+
+  inline Phase nextPhase(Phase phase) const
+  {
+    if (phase == Phase::End) {
+      return Phase::End;
+    }
+    return static_cast<Phase>(static_cast<int>(phase) + 1);
+  }
+
+  inline void goToNextPhase()
+  {
+    phase_ = nextPhase(phase_);
+    mc_rtc::log::info("[RunStabilizer] go to {}.", toString(phase_));
+  }
+
+  inline void goToNextPhaseWithCheck()
+  {
+    if (auto_mode_ || go_next_) {
+      goToNextPhase();
+      go_next_ = false;
+    }
+  }
+
+  inline bool handReached(double thre = 1e-2)
+  {
+    return (imp_tasks_.at(Arm::Left)->eval().norm() < thre) &&
+        (imp_tasks_.at(Arm::Right)->eval().norm() < thre);
+  }
 
   inline sva::PTransformd projGround(const sva::PTransformd& pose) const
   {
@@ -57,37 +138,54 @@ struct RunStabilizer : State
         0.5);
   }
 
-  std::shared_ptr<mc_tasks::force::AdmittanceTask> left_admit_task_;
-  std::shared_ptr<mc_tasks::force::AdmittanceTask> right_admit_task_;
+ protected:
+  Phase phase_ = Phase::StandBy;
+  bool go_next_ = false;
 
-  int reach_phase_ = 1;
+  // surface name of hands
+  std::unordered_map<Arm, std::string> surface_names_ = {
+    {Arm::Left, "LeftHand"}, {Arm::Right, "RightHand"}};
 
-  Eigen::Vector3d target_left_hand_force_ = Eigen::Vector3d::Zero();
-  Eigen::Vector3d target_right_hand_force_ = Eigen::Vector3d::Zero();
-  Eigen::Vector3d current_left_hand_force_ = Eigen::Vector3d::Zero();
-  Eigen::Vector3d current_right_hand_force_ = Eigen::Vector3d::Zero();
+  // impedance task of hands
+  std::unordered_map<Arm, std::shared_ptr<mc_tasks::force::ImpedanceTask> > imp_tasks_;
 
-  std::vector<std::pair<Eigen::Vector3d, sva::ForceVecd> > ext_wrenches_;
+  // target hand wrenches
+  std::unordered_map<Arm, sva::ForceVecd> target_hand_wrenches_ = {
+    {Arm::Left, sva::ForceVecd::Zero()}, {Arm::Right, sva::ForceVecd::Zero()}};
 
-  Eigen::Vector3d target_cnoid_ext_force_offset_ = Eigen::Vector3d::Zero();
-  Eigen::Vector3d current_cnoid_ext_force_offset_ = Eigen::Vector3d::Zero();
+  // target position of hands
+  std::unordered_map<Arm, Eigen::Vector3d> target_hand_poss_;
 
-  double first_ = true;
+  // target pose of hands relative to foot middle pose
+  std::unordered_map<Arm, sva::PTransformd> rel_target_hand_poses_;
 
-  double hand_force_rate_limit_ = 50;
+  // hand contacts
+  std::unordered_map<Arm, mc_control::fsm::Contact> hand_contacts_;
 
-  mc_control::fsm::Contact left_hand_contact_;
-  mc_control::fsm::Contact right_hand_contact_;
+  // goal hand forces
+  std::unordered_map<Arm, Eigen::Vector3d> goal_hand_forces_ = {
+    {Arm::Left, Eigen::Vector3d::Zero()}, {Arm::Right, Eigen::Vector3d::Zero()}};
+  // interpolated hand forces
+  std::unordered_map<Arm, Eigen::Vector3d> interp_hand_forces_ = {
+    {Arm::Left, Eigen::Vector3d::Zero()}, {Arm::Right, Eigen::Vector3d::Zero()}};
 
+  // goal cnoid external force offset
+  Eigen::Vector3d goal_cnoid_ext_force_offset_ = Eigen::Vector3d::Zero();
+  // interpolated cnoid external force offset
+  Eigen::Vector3d interp_cnoid_ext_force_offset_ = Eigen::Vector3d::Zero();
+
+  // Configuration
+  bool auto_mode_ = false;
+  bool grasp_ = true;
+  bool enable_impedance_ = true;
+  double hand_force_rate_limit_ = 20;
+  double approach_dist_ = 0.2;
+  bool publish_cnoid_ = false;
+
+  // ROS variables
   std::shared_ptr<ros::NodeHandle> nh_;
-  ros::Publisher ext_force_pub_;
-
-  std::vector<sva::PTransformd> rel_target_poses_;
-
-  bool enamble_admittance_ = true;
-  Eigen::Vector3d admit_gain_ = {0, 0.01, 0.01};
-  Eigen::Vector3d admit_stiffness_ = {1., 1., 10.};
-  Eigen::Vector3d admit_damping_ = {1., 1., 1.};
+  ros::Publisher cnoid_ext_force_pub_;
+  ros::Publisher cnoid_wall_force_pub_;
 };
 
 } // namespace states

@@ -1117,7 +1117,7 @@ StatesLibraries:
 - "@MC_CONTROLLER_INSTALL_PREFIX@/lipm_walking_controller/states"
 Managed: false
 StepByStep: false
-autoplay: true
+autoplay: false # true
 init: Initial
 states:
   WalkInternal:
@@ -1140,7 +1140,7 @@ ObserverPipelines:
   gui: true
   observers:
     - type: Encoder
-    - type: Attitude
+    # - type: Attitude
     - type: KinematicInertial
       config:
         anchorFrame:
@@ -1149,7 +1149,11 @@ ObserverPipelines:
       update: false
 
 RunStabilizerConfig:
-  EnableAdmittance: true
-  AdmittanceGain: [0.01, 0.01, 0.01]
-  AdmittanceStiffness: [1., 1., 1.]
-  AdmittanceDamping: [1., 1., 100.]
+  AutoMode: false
+  Grasp: true
+  EnableImpedance: true
+  HandForceRateLimit: 20.0
+  ApproachDist: 0.2
+  PublishCnoid: false
+  # LeftGraspPos: [0.6, 0.5, 1.0]
+  LeftGraspPos: [0.6, 0.46, 1.1] # for ConstructionPipe

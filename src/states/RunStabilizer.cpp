@@ -4,6 +4,7 @@
 
 #include <eigen_conversions/eigen_msg.h>
 #include <hwm_msgs/CnoidExternalForceArray.h>
+#include <geometry_msgs/Vector3Stamped.h>
 
 #include "RunStabilizer.h"
 
@@ -13,8 +14,26 @@ namespace lipm_walking
 states::RunStabilizer::RunStabilizer():
     nh_(mc_rtc::ROSBridge::get_node_handle())
 {
-  ext_force_pub_ = nh_->advertise<hwm_msgs::CnoidExternalForceArray>(
-      "cnoid_external_force", 1, true);
+  // make contact instance
+  {
+    Eigen::Vector6d hand_contact_dof = Eigen::Vector6d::Ones();
+    hand_contact_dof[5] = 0;
+    hand_contacts_.clear();
+    for (auto arm : BOTH_ARMS) {
+      hand_contacts_.emplace(
+          arm,
+          mc_control::fsm::Contact(
+              "hrp5_p", "ground", surface_names_.at(arm), "AllGround",
+              mc_rbdyn::Contact::defaultFriction,
+              hand_contact_dof));
+    }
+  }
+
+  // setup ROS
+  cnoid_ext_force_pub_ = nh_->advertise<hwm_msgs::CnoidExternalForceArray>(
+      "cnoid/external_force", 1, true);
+  cnoid_wall_force_pub_ = nh_->advertise<geometry_msgs::Vector3Stamped>(
+      "cnoid/wall_force_command", 1, true);
 }
 
 void states::RunStabilizer::start()
@@ -22,60 +41,63 @@ void states::RunStabilizer::start()
   auto & ctl = controller();
 
   // read configuration
-  if (ctl.config().has("RunStabilizerConfig")) {
-    const auto stabilizer_config = ctl.config()("RunStabilizerConfig");
-    stabilizer_config("EnableAdmittance", enamble_admittance_);
-    stabilizer_config("AdmittanceGain", admit_gain_);
-    stabilizer_config("AdmittanceStiffness", admit_stiffness_);
-    stabilizer_config("AdmittanceDamping", admit_damping_);
-  }
-
-  // add stabilizer task
-  ctl.solver().addTask(stabilizer());
-  stabilizer()->setApplyComOffset(true);
-
-  // add admittance task
-  left_admit_task_ = std::make_shared<mc_tasks::force::AdmittanceTask>(
-      "LeftHand",
-      ctl.robots(),
-      ctl.robot().robotIndex());
-  ctl.solver().addTask(left_admit_task_);
-  left_admit_task_->reset();
-  right_admit_task_ = std::make_shared<mc_tasks::force::AdmittanceTask>(
-      "RightHand",
-      ctl.robots(),
-      ctl.robot().robotIndex());
-  ctl.solver().addTask(right_admit_task_);
-  right_admit_task_->reset();
-
-  // initialize external wrenches
-  ext_wrenches_.resize(2);
-  ext_wrenches_[0].second = sva::ForceVecd::Zero();
-  ext_wrenches_[1].second = sva::ForceVecd::Zero();
-
-  // make contact instance
-  Eigen::Vector6d hand_contact_dof = Eigen::Vector6d::Ones();
-  hand_contact_dof[5] = 0;
-  left_hand_contact_ = mc_control::fsm::Contact(
-      "hrp5_p", "ground", "LeftHand", "AllGround",
-      mc_rbdyn::Contact::defaultFriction,
-      hand_contact_dof);
-  right_hand_contact_ = mc_control::fsm::Contact(
-      "hrp5_p", "ground", "RightHand", "AllGround",
-      mc_rbdyn::Contact::defaultFriction,
-      hand_contact_dof);
-
-  // close gripper
-  for (auto & g : ctl.robot().grippers()) {
-    g.get().percentVMAX(0.6);
-    g.get().setTargetOpening(0.0);
+  {
+    Eigen::Vector3d left_grasp_pos(0.6, 0.5, 1.0);
+    if (ctl.config().has("RunStabilizerConfig")) {
+      const auto stabilizer_config = ctl.config()("RunStabilizerConfig");
+      stabilizer_config("AutoMode", auto_mode_);
+      stabilizer_config("Grasp", grasp_);
+      stabilizer_config("EnableImpedance", enable_impedance_);
+      stabilizer_config("HandForceRateLimit", hand_force_rate_limit_);
+      stabilizer_config("ApproachDist", approach_dist_);
+      stabilizer_config("PublishCnoid", publish_cnoid_);
+      stabilizer_config("LeftGraspPos", left_grasp_pos);
+    }
+    target_hand_poss_ = {
+      {Arm::Left, left_grasp_pos},
+      {Arm::Right, Eigen::Vector3d(left_grasp_pos[0], -left_grasp_pos[1], left_grasp_pos[2])}};
   }
 
   // setup logger and GUI
   setupLogger(ctl);
   setupGui(ctl);
 
-  output("OK");
+  // setup StabilizerTask
+  ctl.solver().addTask(stabilizer());
+  // use only fz of measured wrench to make it robust agaist contact errors
+  stabilizer()->extWrenchGain(
+      sva::MotionVecd(Eigen::Vector3d::Zero(), Eigen::Vector3d(0., 0., 1.)));
+
+  // setup ImpedanceTask
+  {
+    sva::ForceVecd impM(Eigen::Vector3d::Constant(2.0), Eigen::Vector3d::Constant(10.0));
+    sva::ForceVecd impD(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d::Constant(1000.0));
+    sva::ForceVecd impK(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d::Constant(1000.0));
+    imp_tasks_.clear();
+    for (auto arm : BOTH_ARMS) {
+      auto imp_task = std::make_shared<mc_tasks::force::ImpedanceTask>(
+          surface_names_.at(arm),
+          ctl.robots(),
+          ctl.robot().robotIndex());
+      imp_tasks_.emplace(arm, imp_task);
+      imp_task->impedance(impM, impD, impK);
+      imp_task->reset();
+      ctl.solver().addTask(imp_task);
+      if (enable_impedance_) {
+        imp_task->wrenchGain(sva::MotionVecd(Eigen::Vector3d::Ones(), Eigen::Vector3d::Ones()));
+      } else {
+        imp_task->wrenchGain(sva::MotionVecd::Zero());
+      }
+    }
+  }
+
+  // open gripper
+  for (auto & g : ctl.robot().grippers()) {
+    g.get().percentVMAX(0.6);
+    g.get().setTargetOpening(1.0);
+  }
+
+  mc_rtc::log::success("[RunStabilizer] started RunStabilizer state.");
 }
 
 void states::RunStabilizer::runState()
@@ -83,102 +105,169 @@ void states::RunStabilizer::runState()
   auto & ctl = controller();
   double dt = ctl.timeStep;
 
-  // calculate the current value by interpolating the target value
-  current_left_hand_force_ +=
-      (target_left_hand_force_ - current_left_hand_force_).cwiseMax(
-          -1 * dt * hand_force_rate_limit_).cwiseMin(
-              dt * hand_force_rate_limit_);
-  current_right_hand_force_ +=
-      (target_right_hand_force_ - current_right_hand_force_).cwiseMax(
+  // interpolate the goal value
+  for (auto arm : BOTH_ARMS) {
+    interp_hand_forces_.at(arm) +=
+        (goal_hand_forces_.at(arm) - interp_hand_forces_.at(arm)).cwiseMax(
+            -1 * dt * hand_force_rate_limit_).cwiseMin(
+                dt * hand_force_rate_limit_);
+  }
+
+  interp_cnoid_ext_force_offset_ +=
+      (goal_cnoid_ext_force_offset_ - interp_cnoid_ext_force_offset_).cwiseMax(
           -1 * dt * hand_force_rate_limit_).cwiseMin(
               dt * hand_force_rate_limit_);
 
-  current_cnoid_ext_force_offset_ +=
-      (target_cnoid_ext_force_offset_ - current_cnoid_ext_force_offset_).cwiseMax(
-          -1 * dt * hand_force_rate_limit_).cwiseMin(
-              dt * hand_force_rate_limit_);
+  // update the external wrenches of StabilizerTask and ImpedanceTask
+  std::vector<std::pair<std::string, sva::ForceVecd> > ext_wrenches;
+  for (auto arm : BOTH_ARMS) {
+    target_hand_wrenches_.at(arm).force() = interp_hand_forces_.at(arm);
+    imp_tasks_.at(arm)->targetWrench(target_hand_wrenches_.at(arm));
+    ext_wrenches.emplace_back(surface_names_.at(arm), target_hand_wrenches_.at(arm));
+  }
+  stabilizer()->setExtWrenches(ext_wrenches);
 
-  // update the external wrenches
-  ext_wrenches_[0].first = left_admit_task_->surfacePose().translation();
-  ext_wrenches_[0].second.force() = current_left_hand_force_;
-  ext_wrenches_[1].first = right_admit_task_->surfacePose().translation();
-  ext_wrenches_[1].second.force() = current_right_hand_force_;
-  stabilizer()->setExtWrenches(ext_wrenches_);
-  left_admit_task_->targetWrenchW(ext_wrenches_[0].second);
-  right_admit_task_->targetWrenchW(ext_wrenches_[1].second);
+  // update the target pose of the impedance tasks
+  switch (phase_) {
+    case Phase::StandBy:
+      {
+        bool gripper_complete = true;
+        for (auto & g : ctl.robot().grippers()) {
+          if (!g.get().complete()) {
+            gripper_complete = false;
+          }
+        }
+        if (gripper_complete) {
+          goToNextPhaseWithCheck();
+        }
+      }
+      break;
+    case Phase::ReachWayPointInit:
+      for (auto arm : BOTH_ARMS) {
+        imp_tasks_.at(arm)->desiredPose(
+            sva::PTransformd(
+                sva::RotY(-M_PI/2),
+                target_hand_poss_.at(arm) - approach_dist_ * Eigen::Vector3d::UnitX()));
+      }
+      goToNextPhase();
+      break;
+    case Phase::ReachWayPointWait:
+      if (handReached(1e-1)) {
+        goToNextPhaseWithCheck();
+      }
+      break;
+    case Phase::ReachTargetInit:
+      for (auto arm : BOTH_ARMS) {
+        imp_tasks_.at(arm)->desiredPose(
+            sva::PTransformd(sva::RotY(-M_PI/2), target_hand_poss_.at(arm)));
+      }
+      goToNextPhase();
+      break;
+    case Phase::ReachTargetWait:
+      if (handReached()) {
+        goToNextPhaseWithCheck();
+      }
+      break;
+    case Phase::Grasp:
+      // store hand pose relative to foot midpose
+      {
+        sva::PTransformd foot_midpose = footMidpose(ctl);
+        rel_target_hand_poses_.clear();
+        for (auto arm : BOTH_ARMS) {
+          rel_target_hand_poses_.emplace(
+              arm,
+              imp_tasks_.at(arm)->desiredPose() * foot_midpose.inv());
+        }
+      }
+
+      // close gripper
+      if (grasp_) {
+        for (auto & g : ctl.robot().grippers()) {
+          g.get().setTargetOpening(0.0);
+        }
+      }
+
+      goToNextPhase();
+      break;
+    case Phase::Hold:
+      {
+        sva::PTransformd foot_midpose = footMidpose(ctl);
+        for (auto arm : BOTH_ARMS) {
+          imp_tasks_.at(arm)->desiredPose(rel_target_hand_poses_.at(arm) * foot_midpose);
+        }
+      }
+      goToNextPhaseWithCheck();
+      break;
+    case Phase::Ungrasp:
+      if (grasp_) {
+        for (auto & g : ctl.robot().grippers()) {
+          g.get().setTargetOpening(1.0);
+        }
+      }
+      goToNextPhaseWithCheck();
+      break;
+    case Phase::ReleaseWayPointInit:
+      for (auto arm : BOTH_ARMS) {
+        imp_tasks_.at(arm)->desiredPose(
+            sva::PTransformd(
+                sva::RotY(-M_PI/2),
+                target_hand_poss_.at(arm) - approach_dist_ * Eigen::Vector3d::UnitX()));
+      }
+      goToNextPhase();
+      break;
+    case Phase::ReleaseWayPointWait:
+      if (handReached(1e-1)) {
+        goToNextPhaseWithCheck();
+      }
+      break;
+    case Phase::NominalPosture:
+      for (auto arm : BOTH_ARMS) {
+        imp_tasks_.at(arm)->weight(0);
+      }
+      goToNextPhase();
+      break;
+    case Phase::End:
+      break;
+  }
 
   // publish the external wrenches to the choreonoid
-  hwm_msgs::CnoidExternalForceArray ext_force_arr_msg;
-  std::vector<std::string> hand_link_names = {"LHDY", "RHDY"};
-  std::vector<std::shared_ptr<mc_tasks::force::AdmittanceTask> > admit_tasks =
-      {left_admit_task_, right_admit_task_};
-  for (auto i : {0, 1}) {
-    hwm_msgs::CnoidExternalForce ext_force_msg;
-    ext_force_msg.tm = ros::Duration(100.0);
-    ext_force_msg.robot = "HRP5P";
-    ext_force_msg.link = hand_link_names[i];
-    // ext_force_msg.link = ctl.robot().surface(admit_tasks[i]).bodyName();
-    tf::pointEigenToMsg(Eigen::Vector3d::Zero(), ext_force_msg.position);
+  if (publish_cnoid_ ) {
+    hwm_msgs::CnoidExternalForceArray ext_force_arr_msg;
+    geometry_msgs::Vector3Stamped wall_force_command_msg;
+    Eigen::Vector3d wall_force_command = Eigen::Vector3d::Zero();
+    for (auto arm : BOTH_ARMS) {
+      std::string joint_name = "";
+      {
+        const auto & mb = ctl.robot().mb();
+        const auto & body_name = ctl.robot().surface(surface_names_.at(arm)).bodyName();
+        int body_idx = mb.bodyIndexByName(body_name);
+        for (int joint_idx = 0; joint_idx < mb.nrJoints(); joint_idx++) {
+          if (body_idx == mb.successor(joint_idx)) {
+            joint_name = mb.joint(joint_idx).name();
+            break;
+          }
+        }
+        if (joint_name.empty()) {
+          mc_rtc::log::error_and_throw<std::runtime_error>("[RunStabilizer] Parent-side joint of body {} not found.", body_name);
+        }
+      }
+
+      hwm_msgs::CnoidExternalForce ext_force_msg;
+      ext_force_msg.tm = ros::Duration(100.0);
+      ext_force_msg.robot = "HRP5P";
+      ext_force_msg.link = joint_name;
+      tf::pointEigenToMsg(Eigen::Vector3d::Zero(), ext_force_msg.position);
+      sva::PTransformd surfacePose = ctl.realRobot().surfacePose(surface_names_.at(arm));
+      sva::PTransformd T_s_0(Eigen::Matrix3d(surfacePose.rotation().transpose()));
+      Eigen::Vector3d forceW = T_s_0.dualMul(target_hand_wrenches_.at(arm)).force();
+      tf::vectorEigenToMsg(forceW + interp_cnoid_ext_force_offset_, ext_force_msg.force);
+      ext_force_arr_msg.forces.push_back(ext_force_msg);
+      wall_force_command += forceW + interp_cnoid_ext_force_offset_;
+    }
+    cnoid_ext_force_pub_.publish(ext_force_arr_msg);
     tf::vectorEigenToMsg(
-        ext_wrenches_[i].second.force() + current_cnoid_ext_force_offset_, ext_force_msg.force);
-    ext_force_arr_msg.forces.push_back(ext_force_msg);
-  }
-  ext_force_pub_.publish(ext_force_arr_msg);
-
-  // update the target pose of the admittance tasks
-  switch (reach_phase_) {
-    case 1:
-      left_admit_task_->targetPose(
-          sva::PTransformd{sva::RotY(-M_PI/2), Eigen::Vector3d{0.3, 0.5, 1.0}});
-      right_admit_task_->targetPose(
-          sva::PTransformd{sva::RotY(-M_PI/2), Eigen::Vector3d{0.3, -0.5, 1.0}});
-      reach_phase_ = 2;
-      break;
-    case 2:
-      if (left_admit_task_->eval().norm() < 1e-1 && right_admit_task_->eval().norm() < 1e-1) {
-        reach_phase_ = 3;
-      }
-      break;
-    case 3:
-      left_admit_task_->targetPose(
-          sva::PTransformd{sva::RotY(-M_PI/2), Eigen::Vector3d{0.6, 0.5, 1.0}});
-      right_admit_task_->targetPose(
-          sva::PTransformd{sva::RotY(-M_PI/2), Eigen::Vector3d{0.6, -0.5, 1.0}});
-      reach_phase_ = 4;
-      break;
-    case 4:
-      if (left_admit_task_->eval().norm() < 1e-2 && right_admit_task_->eval().norm() < 1e-2) {
-        reach_phase_ = 5;
-      }
-      break;
-    case 5:
-      // enable admittance to the z direction
-      if (enamble_admittance_) {
-        left_admit_task_->admittance({Eigen::Vector3d::Zero(), admit_gain_});
-        left_admit_task_->stiffness({{1., 1., 1.}, admit_stiffness_});
-        left_admit_task_->damping({{1., 1., 1.}, admit_damping_});
-        right_admit_task_->admittance({Eigen::Vector3d::Zero(), admit_gain_});
-        right_admit_task_->stiffness({{1., 1., 1.}, admit_stiffness_});
-        right_admit_task_->damping({{1., 1., 1.}, admit_damping_});
-      }
-
-      // save target pose relative to foot midpose
-      {
-        sva::PTransformd foot_midpose = footMidpose(ctl);
-        rel_target_poses_ = {
-          left_admit_task_->targetPose() * foot_midpose.inv(),
-          right_admit_task_->targetPose() * foot_midpose.inv()};
-      }
-
-      reach_phase_ = 6;
-      break;
-    case 6:
-      {
-        sva::PTransformd foot_midpose = footMidpose(ctl);
-        left_admit_task_->targetPose(rel_target_poses_[0] * foot_midpose);
-        right_admit_task_->targetPose(rel_target_poses_[1] * foot_midpose);
-      }
-      break;
+        wall_force_command, wall_force_command_msg.vector);
+    cnoid_wall_force_pub_.publish(wall_force_command_msg);
   }
 }
 
@@ -186,44 +275,60 @@ void states::RunStabilizer::teardown()
 {
   auto & ctl = controller();
   ctl.solver().removeTask(stabilizer());
+
+  mc_rtc::log::success("[RunStabilizer] teared down RunStabilizer state.");
 }
 
 bool states::RunStabilizer::checkTransitions()
 {
+  // this state does not break
   return false;
 }
 
 void states::RunStabilizer::setupLogger(mc_control::fsm::Controller & ctl)
 {
+  ctl.logger().addLogEntry("HandForceTest_phase",
+                           [this]() { return static_cast<int>(phase_); });
   ctl.logger().addLogEntry("HandForceTest_TargetWrench_LeftHand",
                            [this]() -> const sva::ForceVecd
-                           { return ext_wrenches_[0].second; });
+                           { return target_hand_wrenches_.at(Arm::Left); });
 
   ctl.logger().addLogEntry("HandForceTest_TargetWrench_RightHand",
                            [this]() -> const sva::ForceVecd
-                           { return ext_wrenches_[1].second; });
+                           { return target_hand_wrenches_.at(Arm::Right); });
 
   ctl.logger().addLogEntry("HandForceTest_MeasuredWrench_LeftHand",
                            [&ctl]() -> const sva::ForceVecd
-                           { return ctl.robot().forceSensor(
-                               "LeftHandForceSensor").worldWrenchWithoutGravity(ctl.robot()); });
+                           { return ctl.robot().surfaceWrench("LeftHand"); });
 
   ctl.logger().addLogEntry("HandForceTest_MeasuredWrench_RightHand",
                            [&ctl]() -> const sva::ForceVecd
-                           { return ctl.robot().forceSensor(
-                               "RightHandForceSensor").worldWrenchWithoutGravity(ctl.robot()); });
+                           { return ctl.robot().surfaceWrench("RightHand"); });
 }
 
 void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
 {
-  // currently default reach_phase_ = 1, so reaching is automatically starts
-  // ctl.gui()->addElement(
-  //     {"HandForceTest"},
-  //     mc_rtc::gui::Button(
-  //         "ReachToWall", [this]() {
-  //           reach_phase_ = 1;
-  //           reach_start_time_ = ros::Time::now();
-  //         }));
+  if (!auto_mode_) {
+    ctl.gui()->addElement(
+        {"HandForceTest"}, mc_rtc::gui::ElementsStacking::Horizontal,
+        mc_rtc::gui::Label("Next phase", [this]() { return toString(nextPhase(phase_)); }),
+        mc_rtc::gui::Button("Go to next phase", [this]() { go_next_ = true; }));
+  }
+
+  ctl.gui()->addElement(
+      {"HandForceTest"}, mc_rtc::gui::ElementsStacking::Horizontal,
+      mc_rtc::gui::Button(
+          "Open gripper", [this, &ctl]() {
+            for (auto & g : ctl.robot().grippers()) {
+              g.get().setTargetOpening(1.0);
+            }
+          }),
+      mc_rtc::gui::Button(
+          "Close gripper", [this, &ctl]() {
+            for (auto & g : ctl.robot().grippers()) {
+              g.get().setTargetOpening(0.0);
+            }
+          }));
 
   ctl.gui()->addElement(
       {"HandForceTest", "Force"},
@@ -232,74 +337,105 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
           [this]() { return hand_force_rate_limit_; },
           [this](double v) {
             hand_force_rate_limit_ = v;
-            mc_rtc::log::info("hand_force_rate_limit is changed to {}.",
+            mc_rtc::log::info("[RunStabilizer] hand_force_rate_limit is changed to {}.",
                               hand_force_rate_limit_);
-          }));
-
-  ctl.gui()->addElement(
-      {"HandForceTest", "Force"},
+          }),
       mc_rtc::gui::ArrayInput(
           "Both hands force",
           {"x", "y", "z"},
-          [this]() -> const Eigen::Vector3d { return Eigen::Vector3d::Zero(); },
+          [this]() -> const Eigen::Vector3d {
+            if ((interp_hand_forces_.at(Arm::Left) - interp_hand_forces_.at(Arm::Right)).norm() < 1e-10) {
+              return interp_hand_forces_.at(Arm::Left);
+            } else {
+              return Eigen::Vector3d::Zero();
+            }
+          },
           [this](const Eigen::Vector3d& v) {
-            target_left_hand_force_ = v;
-            target_right_hand_force_ = v;
-            mc_rtc::log::info("both_hands_force is changed to {}.",
-                              target_left_hand_force_.transpose());
-          }));
-
-  ctl.gui()->addElement(
-      {"HandForceTest", "Force"},
+            goal_hand_forces_.at(Arm::Left) = v;
+            goal_hand_forces_.at(Arm::Right) = v;
+            mc_rtc::log::info("[RunStabilizer] both_hands_force is changed to {}.",
+                              goal_hand_forces_.at(Arm::Left).transpose());
+          }),
       mc_rtc::gui::ArrayInput(
           "Left hand force",
           {"x", "y", "z"},
-          [this]() { return target_left_hand_force_; },
+          [this]() { return interp_hand_forces_.at(Arm::Left); },
           [this](const Eigen::Vector3d& v) {
-            target_left_hand_force_ = v;
-            mc_rtc::log::info("left_hand_force is changed to {}.",
-                              target_left_hand_force_.transpose());
-          }));
-
-  ctl.gui()->addElement(
-      {"HandForceTest", "Force"},
+            goal_hand_forces_.at(Arm::Left) = v;
+            mc_rtc::log::info("[RunStabilizer] left_hand_force is changed to {}.",
+                              goal_hand_forces_.at(Arm::Left).transpose());
+          }),
       mc_rtc::gui::ArrayInput(
           "Right hand force",
           {"x", "y", "z"},
-          [this]() { return target_right_hand_force_; },
+          [this]() { return interp_hand_forces_.at(Arm::Right); },
           [this](const Eigen::Vector3d& v) {
-            target_right_hand_force_ = v;
-            mc_rtc::log::info("right_hand_force is changed to {}.",
-                              target_right_hand_force_.transpose());
-          }));
-
-  ctl.gui()->addElement(
-      {"HandForceTest", "Force"},
+            goal_hand_forces_.at(Arm::Right) = v;
+            mc_rtc::log::info("[RunStabilizer] right_hand_force is changed to {}.",
+                              goal_hand_forces_.at(Arm::Right).transpose());
+          }),
+      mc_rtc::gui::ArrayInput(
+          "impedance",
+          {"M", "D", "K"},
+          [this]() {
+            return Eigen::Vector3d(
+                imp_tasks_.at(Arm::Left)->impedanceM().force()[0],
+                imp_tasks_.at(Arm::Left)->impedanceD().force()[0],
+                imp_tasks_.at(Arm::Left)->impedanceK().force()[0]);
+          },
+          [this](const Eigen::Vector3d& v) {
+            for (auto arm : BOTH_ARMS) {
+              imp_tasks_.at(arm)->impedancePosition(
+                  Eigen::Vector3d::Constant(v[0]),
+                  Eigen::Vector3d::Constant(v[1]),
+                  Eigen::Vector3d::Constant(v[2]));
+            }
+            mc_rtc::log::info("[RunStabilizer] impedance is changed to {}.",
+                              v.transpose());
+          }),
       mc_rtc::gui::ArrayInput(
           "Cnoid external force offset",
           {"x", "y", "z"},
-          [this]() -> const Eigen::Vector3d { return target_cnoid_ext_force_offset_; },
+          [this]() -> const Eigen::Vector3d { return interp_cnoid_ext_force_offset_; },
           [this](const Eigen::Vector3d& v) {
-            target_cnoid_ext_force_offset_ = v;
-            mc_rtc::log::info("cnoid_ext_force_offset is changed to {}.",
-                              target_cnoid_ext_force_offset_.transpose());
+            goal_cnoid_ext_force_offset_ = v;
+            mc_rtc::log::info("[RunStabilizer] cnoid_ext_force_offset is changed to {}.",
+                              goal_cnoid_ext_force_offset_.transpose());
           }));
 
   ctl.gui()->addElement(
       {"HandForceTest", "Contact"},
       mc_rtc::gui::Button(
           "Add contacts of both hands", [this, &ctl]() {
-            ctl.addContact(left_hand_contact_);
-            ctl.addContact(right_hand_contact_);
+            for (const auto c : hand_contacts_) {
+              ctl.addContact(c.second);
+            }
+          }),
+      mc_rtc::gui::Button(
+          "Remove contacts of both hands", [this, &ctl]() {
+            for (const auto c : hand_contacts_) {
+              ctl.removeContact(c.second);
+            }
           }));
 
   ctl.gui()->addElement(
-      {"HandForceTest", "Contact"},
-      mc_rtc::gui::Button(
-          "Remove contacts of both hands", [this, &ctl]() {
-            ctl.removeContact(left_hand_contact_);
-            ctl.removeContact(right_hand_contact_);
-          }));
+      {"HandForceTest", "Configuration"},
+      mc_rtc::gui::Checkbox(
+          "AutoMode",
+          [this]() { return auto_mode_; },
+          [this]() { auto_mode_ = !auto_mode_; }),
+      mc_rtc::gui::Checkbox(
+          "Grasp",
+          [this]() { return grasp_; },
+          [this]() { grasp_ = !grasp_; }),
+      mc_rtc::gui::Checkbox(
+          "EnableImpedance",
+          [this]() { return enable_impedance_; },
+          [this]() { enable_impedance_ = !enable_impedance_; }),
+      mc_rtc::gui::Checkbox(
+          "PublishCnoid",
+          [this]() { return publish_cnoid_; },
+          [this]() { publish_cnoid_ = !publish_cnoid_; }));
 }
 
 } // namespace lipm_walking
