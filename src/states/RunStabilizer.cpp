@@ -394,6 +394,28 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
                               v.transpose());
           }),
       mc_rtc::gui::ArrayInput(
+          "impedanceZAxis",
+          {"M", "D", "K"},
+          [this]() {
+            return Eigen::Vector3d(
+                imp_tasks_.at(Arm::Left)->impedanceM().force()[2],
+                imp_tasks_.at(Arm::Left)->impedanceD().force()[2],
+                imp_tasks_.at(Arm::Left)->impedanceK().force()[2]);
+          },
+          [this](const Eigen::Vector3d& v) {
+	    Eigen::Vector3d impM = imp_tasks_.at(Arm::Left)->impedanceM().force();
+	    Eigen::Vector3d impD = imp_tasks_.at(Arm::Left)->impedanceD().force();
+	    Eigen::Vector3d impK = imp_tasks_.at(Arm::Left)->impedanceK().force();
+	    impM[2] = v[0];
+	    impD[2] = v[1];
+	    impK[2] = v[2];
+            for (auto arm : BOTH_ARMS) {
+              imp_tasks_.at(arm)->impedancePosition(impM, impD, impK);
+            }
+            mc_rtc::log::info("[RunStabilizer] Z-Axis impedance is changed to {}.",
+                              v.transpose());
+          }),
+      mc_rtc::gui::ArrayInput(
           "Cnoid external force offset",
           {"x", "y", "z"},
           [this]() -> const Eigen::Vector3d { return interp_cnoid_ext_force_offset_; },
