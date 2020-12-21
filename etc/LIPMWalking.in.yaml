@@ -67,10 +67,20 @@ robot_models:
           integral: 0.0
           comdError: 0.0
       ext_wrench:
-        # derivator_time_constant: 1.0
-        use_measured_value: true
-        compensate_error: true
-        compensate_error_d: false # true
+        ## general ##
+        add_expected_com_offset: true
+        subtract_measured_value: false
+        ## com offset ##
+        modify_com_error: true
+        modify_zmp_error: true
+        modify_zmp_error_d: false
+        com_offset_err_com_limit: 0.2
+        com_offset_err_zmp_limit: 0.1
+        ## filter ##
+        ext_wrench_sum_cutoff: 0.05
+        com_offset_cutoff: 0.05
+        com_offset_com_cutoff: 1.0
+        derivator_time_constant: 1.0
   jvrc1:
     sole:
       half_length: 0.11
