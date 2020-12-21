@@ -71,7 +71,7 @@ robot_models:
         add_expected_com_offset: true
         subtract_measured_value: false
         ## com offset ##
-        modify_com_error: true
+        modify_com_error: false
         modify_zmp_error: true
         modify_zmp_error_d: false
         com_offset_err_com_limit: 0.2
@@ -79,7 +79,7 @@ robot_models:
         ## filter ##
         ext_wrench_sum_cutoff: 0.05
         com_offset_cutoff: 0.05
-        com_offset_com_cutoff: 1.0
+        com_offset_com_cutoff: 10.0
         derivator_time_constant: 1.0
   jvrc1:
     sole:
