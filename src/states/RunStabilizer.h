@@ -142,31 +142,43 @@ struct RunStabilizer : State
   Phase phase_ = Phase::StandBy;
   bool go_next_ = false;
 
+  /*! \brief See
+   * https://github.com/jrl-umi3218/mc_rtc/blob/29b471e7ef317eca3358327c664196ee657a8ab4/include/mc_tasks/lipm_stabilizer/StabilizerTask.h#L664-L671
+   */
+  struct EnumClassHash
+  {
+    template<typename T>
+    std::size_t operator()(T t) const
+    {
+      return static_cast<std::size_t>(t);
+    }
+  };
+
   // surface name of hands
-  std::unordered_map<Arm, std::string> surface_names_ = {
+  std::unordered_map<Arm, std::string, EnumClassHash> surface_names_ = {
     {Arm::Left, "LeftHand"}, {Arm::Right, "RightHand"}};
 
   // impedance task of hands
-  std::unordered_map<Arm, std::shared_ptr<mc_tasks::force::ImpedanceTask> > imp_tasks_;
+  std::unordered_map<Arm, std::shared_ptr<mc_tasks::force::ImpedanceTask>, EnumClassHash > imp_tasks_;
 
   // target hand wrenches
-  std::unordered_map<Arm, sva::ForceVecd> target_hand_wrenches_ = {
+  std::unordered_map<Arm, sva::ForceVecd, EnumClassHash> target_hand_wrenches_ = {
     {Arm::Left, sva::ForceVecd::Zero()}, {Arm::Right, sva::ForceVecd::Zero()}};
 
   // target position of hands
-  std::unordered_map<Arm, Eigen::Vector3d> target_hand_poss_;
+  std::unordered_map<Arm, Eigen::Vector3d, EnumClassHash> target_hand_poss_;
 
   // target pose of hands relative to foot middle pose
-  std::unordered_map<Arm, sva::PTransformd> rel_target_hand_poses_;
+  std::unordered_map<Arm, sva::PTransformd, EnumClassHash> rel_target_hand_poses_;
 
   // hand contacts
-  std::unordered_map<Arm, mc_control::fsm::Contact> hand_contacts_;
+  std::unordered_map<Arm, mc_control::fsm::Contact, EnumClassHash> hand_contacts_;
 
   // goal hand forces
-  std::unordered_map<Arm, Eigen::Vector3d> goal_hand_forces_ = {
+  std::unordered_map<Arm, Eigen::Vector3d, EnumClassHash> goal_hand_forces_ = {
     {Arm::Left, Eigen::Vector3d::Zero()}, {Arm::Right, Eigen::Vector3d::Zero()}};
   // interpolated hand forces
-  std::unordered_map<Arm, Eigen::Vector3d> interp_hand_forces_ = {
+  std::unordered_map<Arm, Eigen::Vector3d, EnumClassHash> interp_hand_forces_ = {
     {Arm::Left, Eigen::Vector3d::Zero()}, {Arm::Right, Eigen::Vector3d::Zero()}};
 
   // goal cnoid external force offset
