@@ -1,4 +1,4 @@
-initial_plan: custom_forward
+initial_plan: ashibumi
 mpc:
   weights:
     jerk: 1.0
