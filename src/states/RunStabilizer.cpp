@@ -187,6 +187,8 @@ void states::RunStabilizer::runState()
       // close gripper
       if (grasp_) {
         for (auto & g : ctl.robot().grippers()) {
+          g.get().releaseSafetyOffset(mc_rtc::constants::toRad(0));
+          g.get().actualCommandDiffTrigger(mc_rtc::constants::toRad(3));
           g.get().setTargetOpening(0.0);
         }
       }
@@ -336,6 +338,8 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
       mc_rtc::gui::Button(
           "Close gripper", [this, &ctl]() {
             for (auto & g : ctl.robot().grippers()) {
+              g.get().releaseSafetyOffset(mc_rtc::constants::toRad(0));
+              g.get().actualCommandDiffTrigger(mc_rtc::constants::toRad(3));
               g.get().setTargetOpening(0.0);
             }
           }));
