@@ -72,7 +72,7 @@ void states::RunStabilizer::start()
   {
     sva::ForceVecd impM(Eigen::Vector3d::Constant(2.0), Eigen::Vector3d(10.0, 10.0, 10.0));
     sva::ForceVecd impD(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 1000.0, 1500.0));
-    sva::ForceVecd impK(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 1000.0, 500.0));
+    sva::ForceVecd impK(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 1000.0, 100.0));
     imp_tasks_.clear();
     for (auto arm : BOTH_ARMS) {
       auto imp_task = std::make_shared<mc_tasks::force::ImpedanceTask>(
