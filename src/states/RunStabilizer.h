@@ -41,9 +41,9 @@ struct RunStabilizer : State
     ReachWayPointWait,
     ReachTargetInit,
     ReachTargetWait,
-    Grasp,
+    GraspObj,
     Hold,
-    Ungrasp,
+    UngraspObj,
     ReleaseWayPointInit,
     ReleaseWayPointWait,
     NominalPosture,
@@ -62,19 +62,19 @@ struct RunStabilizer : State
         return "Phase::ReachTargetInit";
       case Phase::ReachTargetWait:
         return "Phase::ReachTargetWait";
-      case Phase::Grasp:
-        if (grasp_) {
-          return "Phase::Grasp";
+      case Phase::GraspObj:
+        if (grasp_obj_) {
+          return "Phase::GraspObj";
         } else {
-          return "Phase::Grasp (disabled)";
+          return "Phase::GraspObj (disabled)";
         }
       case Phase::Hold:
         return "Phase::Hold";
-      case Phase::Ungrasp:
-        if (grasp_) {
-          return "Phase::Ungrasp";
+      case Phase::UngraspObj:
+        if (grasp_obj_) {
+          return "Phase::UngraspObj";
         } else {
-          return "Phase::Ungrasp (disabled)";
+          return "Phase::UngraspObj (disabled)";
         }
       case Phase::ReleaseWayPointInit:
         return "Phase::ReleaseWayPointInit";
@@ -100,6 +100,8 @@ struct RunStabilizer : State
 
   void setupGui(mc_control::fsm::Controller & ctl);
 
+  void updateGuiAfterStart(mc_control::fsm::Controller & ctl);
+
   inline Phase nextPhase(Phase phase) const
   {
     if (phase == Phase::End) {
@@ -122,7 +124,17 @@ struct RunStabilizer : State
     }
   }
 
-  inline bool handReached(double evalThre = 5e-2, double speedThre = 1e-3)
+  inline bool gripperCompleted(mc_control::fsm::Controller & ctl) const
+  {
+    for (auto & g : ctl.robot().grippers()) {
+      if (!g.get().complete()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  inline bool handReached(double evalThre = 5e-2, double speedThre = 1e-3) const
   {
     for (auto arm : BOTH_ARMS) {
       if ((imp_tasks_.at(arm)->eval().norm()) > evalThre ||
@@ -201,8 +213,7 @@ struct RunStabilizer : State
 
   // Configuration
   bool auto_mode_ = false;
-  bool grasp_ = true;
-  bool enable_impedance_ = true;
+  bool grasp_obj_ = true;
   double hand_force_rate_limit_ = 20;
   double approach_dist_ = 0.2;
   bool publish_cnoid_ = false;

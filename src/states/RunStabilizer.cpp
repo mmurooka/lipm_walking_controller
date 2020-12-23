@@ -46,8 +46,7 @@ void states::RunStabilizer::start()
     if (ctl.config().has("RunStabilizerConfig")) {
       const auto stabilizer_config = ctl.config()("RunStabilizerConfig");
       stabilizer_config("AutoMode", auto_mode_);
-      stabilizer_config("Grasp", grasp_);
-      stabilizer_config("EnableImpedance", enable_impedance_);
+      stabilizer_config("GraspObj", grasp_obj_);
       stabilizer_config("HandForceRateLimit", hand_force_rate_limit_);
       stabilizer_config("ApproachDist", approach_dist_);
       stabilizer_config("PublishCnoid", publish_cnoid_);
@@ -83,12 +82,8 @@ void states::RunStabilizer::start()
       imp_task->impedance(impM, impD, impK);
       imp_task->reset();
       ctl.solver().addTask(imp_task);
-      if (enable_impedance_) {
-        // temporarily, make the wrench gain of orientation zero
-        imp_task->wrenchGain(sva::MotionVecd(Eigen::Vector3d::Zero(), Eigen::Vector3d::Ones()));
-      } else {
-        imp_task->wrenchGain(sva::MotionVecd::Zero());
-      }
+      // temporarily, make the wrench gain of orientation zero
+      imp_task->wrenchGain(sva::MotionVecd(Eigen::Vector3d::Zero(), Eigen::Vector3d::Ones()));
     }
   }
 
@@ -97,8 +92,12 @@ void states::RunStabilizer::start()
     g.get().percentVMAX(0.6);
     g.get().releaseSafetyOffset(mc_rtc::constants::toRad(0));
     g.get().actualCommandDiffTrigger(mc_rtc::constants::toRad(3));
-    // open gripper
-    g.get().setTargetOpening(1.0);
+    // open or close gripper
+    if (grasp_obj_) {
+      g.get().setTargetOpening(1.0);
+    } else {
+      g.get().setTargetOpening(0.0);
+    }
   }
 
   mc_rtc::log::success("[RunStabilizer] started RunStabilizer state.");
@@ -134,19 +133,13 @@ void states::RunStabilizer::runState()
   // update the target pose of the impedance tasks
   switch (phase_) {
     case Phase::StandBy:
-      {
-        bool gripper_complete = true;
-        for (auto & g : ctl.robot().grippers()) {
-          if (!g.get().complete()) {
-            gripper_complete = false;
-          }
-        }
-        if (gripper_complete) {
-          goToNextPhaseWithCheck();
-        }
+      // requests go_next_ even in auto_mode_ at the start
+      if (gripperCompleted(ctl) && go_next_) {
+        goToNextPhase();
       }
       break;
     case Phase::ReachWayPointInit:
+      updateGuiAfterStart(ctl);
       for (auto arm : BOTH_ARMS) {
         imp_tasks_.at(arm)->desiredPose(
             sva::PTransformd(
@@ -172,7 +165,7 @@ void states::RunStabilizer::runState()
         goToNextPhaseWithCheck();
       }
       break;
-    case Phase::Grasp:
+    case Phase::GraspObj:
       // store hand pose relative to foot midpose
       {
         sva::PTransformd foot_midpose = footMidpose(ctl);
@@ -184,7 +177,7 @@ void states::RunStabilizer::runState()
         }
       }
 
-      if (grasp_) {
+      if (grasp_obj_) {
         for (auto & g : ctl.robot().grippers()) {
           g.get().setTargetOpening(0.0);
         }
@@ -201,8 +194,8 @@ void states::RunStabilizer::runState()
       }
       goToNextPhaseWithCheck();
       break;
-    case Phase::Ungrasp:
-      if (grasp_) {
+    case Phase::UngraspObj:
+      if (grasp_obj_) {
         for (auto & g : ctl.robot().grippers()) {
           g.get().setTargetOpening(1.0);
         }
@@ -317,16 +310,11 @@ void states::RunStabilizer::setupLogger(mc_control::fsm::Controller & ctl)
 
 void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
 {
-  if (auto_mode_) {
-    ctl.gui()->addElement(
-        {"Locomanip"},
-        mc_rtc::gui::Label("Next phase", [this]() { return toString(nextPhase(phase_)); }));
-  } else {
-    ctl.gui()->addElement(
-        {"Locomanip"}, mc_rtc::gui::ElementsStacking::Horizontal,
-        mc_rtc::gui::Label("Next phase", [this]() { return toString(nextPhase(phase_)); }),
-        mc_rtc::gui::Button("Go to next phase", [this]() { go_next_ = true; }));
-  }
+  ctl.gui()->addElement(
+      {"Locomanip"}, mc_rtc::gui::ElementsStacking::Horizontal,
+      mc_rtc::gui::Label("Current", [this]() { return toString(phase_); }),
+      mc_rtc::gui::Label("Next", [this]() { return toString(nextPhase(phase_)); }),
+      mc_rtc::gui::Button("Go next", [this]() { go_next_ = true; }));
 
   ctl.gui()->addElement(
       {"Locomanip", "General"}, mc_rtc::gui::ElementsStacking::Horizontal,
@@ -465,18 +453,15 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
 
   ctl.gui()->addElement(
       {"Locomanip", "Configuration"},
-      mc_rtc::gui::Checkbox(
-          "AutoMode",
-          [this]() { return auto_mode_; },
-          [this]() { auto_mode_ = !auto_mode_; }),
-      mc_rtc::gui::Checkbox(
-          "Grasp",
-          [this]() { return grasp_; },
-          [this]() { grasp_ = !grasp_; }),
-      mc_rtc::gui::Checkbox(
-          "EnableImpedance",
-          [this]() { return enable_impedance_; },
-          [this]() { enable_impedance_ = !enable_impedance_; }));
+      mc_rtc::gui::Label("AutoMode", [this]() { return auto_mode_; }),
+      mc_rtc::gui::Label("GraspObj", [this]() { return grasp_obj_; }));
+}
+
+void states::RunStabilizer::updateGuiAfterStart(mc_control::fsm::Controller & ctl)
+{
+  if (auto_mode_) {
+    ctl.gui()->removeElement({"Locomanip"}, "Go next");
+  }
 }
 
 } // namespace lipm_walking
