@@ -37,15 +37,12 @@ struct RunStabilizer : State
   enum class Phase
   {
     StandBy,
-    ReachWayPointInit,
-    ReachWayPointWait,
-    ReachTargetInit,
-    ReachTargetWait,
+    ReachWayPoint,
+    ReachTarget,
     GraspObj,
     Hold,
     UngraspObj,
-    ReleaseWayPointInit,
-    ReleaseWayPointWait,
+    ReleaseWayPoint,
     NominalPosture,
     End
   };
@@ -54,14 +51,10 @@ struct RunStabilizer : State
     switch (phase) {
       case Phase::StandBy:
         return "Phase::StandBy";
-      case Phase::ReachWayPointInit:
-        return "Phase::ReachWayPointInit";
-      case Phase::ReachWayPointWait:
-        return "Phase::ReachWayPointWait";
-      case Phase::ReachTargetInit:
-        return "Phase::ReachTargetInit";
-      case Phase::ReachTargetWait:
-        return "Phase::ReachTargetWait";
+      case Phase::ReachWayPoint:
+        return "Phase::ReachWayPoint";
+      case Phase::ReachTarget:
+        return "Phase::ReachTarget";
       case Phase::GraspObj:
         if (grasp_obj_) {
           return "Phase::GraspObj";
@@ -76,10 +69,8 @@ struct RunStabilizer : State
         } else {
           return "Phase::UngraspObj (disabled)";
         }
-      case Phase::ReleaseWayPointInit:
-        return "Phase::ReleaseWayPointInit";
-      case Phase::ReleaseWayPointWait:
-        return "Phase::ReleaseWayPointWait";
+      case Phase::ReleaseWayPoint:
+        return "Phase::ReleaseWayPoint";
       case Phase::NominalPosture:
         return "Phase::NominalPosture";
       case Phase::End:
@@ -100,7 +91,11 @@ struct RunStabilizer : State
 
   void setupGui(mc_control::fsm::Controller & ctl);
 
-  void updateGuiAfterStart(mc_control::fsm::Controller & ctl);
+  void updateGuiStartReach(mc_control::fsm::Controller & ctl);
+
+  void updateGuiStartHold(mc_control::fsm::Controller & ctl);
+
+  void updateGuiFinishHold(mc_control::fsm::Controller & ctl);
 
   inline Phase nextPhase(Phase phase) const
   {
@@ -113,6 +108,7 @@ struct RunStabilizer : State
   inline void goToNextPhase()
   {
     phase_ = nextPhase(phase_);
+    phase_switched_ = true;
     mc_rtc::log::info("[RunStabilizer] go to {}.", toString(phase_));
   }
 
@@ -166,6 +162,10 @@ struct RunStabilizer : State
  protected:
   Phase phase_ = Phase::StandBy;
   bool go_next_ = false;
+  bool phase_switched_ = false;
+  bool finish_locomanip_ = false;
+
+  std::vector<std::string> once_flags_;
 
   /*! \brief See
    * https://github.com/jrl-umi3218/mc_rtc/blob/29b471e7ef317eca3358327c664196ee657a8ab4/include/mc_tasks/lipm_stabilizer/StabilizerTask.h#L664-L671
@@ -191,7 +191,7 @@ struct RunStabilizer : State
     {Arm::Left, sva::ForceVecd::Zero()}, {Arm::Right, sva::ForceVecd::Zero()}};
 
   // target position of hands
-  std::unordered_map<Arm, Eigen::Vector3d, EnumClassHash> target_hand_poss_;
+  std::unordered_map<Arm, sva::PTransformd, EnumClassHash> target_hand_poses_;
 
   // target pose of hands relative to foot middle pose
   std::unordered_map<Arm, sva::PTransformd, EnumClassHash> rel_target_hand_poses_;

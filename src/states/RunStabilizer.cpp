@@ -30,10 +30,12 @@ states::RunStabilizer::RunStabilizer():
   }
 
   // setup ROS
-  cnoid_ext_force_pub_ = nh_->advertise<hwm_msgs::CnoidExternalForceArray>(
-      "cnoid/external_force", 1, true);
-  cnoid_wall_force_pub_ = nh_->advertise<geometry_msgs::Vector3Stamped>(
-      "cnoid/wall_force_command", 1, true);
+  if (publish_cnoid_ ) {
+    cnoid_ext_force_pub_ = nh_->advertise<hwm_msgs::CnoidExternalForceArray>(
+        "cnoid/external_force", 1, true);
+    cnoid_wall_force_pub_ = nh_->advertise<geometry_msgs::Vector3Stamped>(
+        "cnoid/wall_force_command", 1, true);
+  }
 }
 
 void states::RunStabilizer::start()
@@ -52,9 +54,11 @@ void states::RunStabilizer::start()
       stabilizer_config("PublishCnoid", publish_cnoid_);
       stabilizer_config("LeftGraspPos", left_grasp_pos);
     }
-    target_hand_poss_ = {
-      {Arm::Left, left_grasp_pos},
-      {Arm::Right, Eigen::Vector3d(left_grasp_pos[0], -left_grasp_pos[1], left_grasp_pos[2])}};
+    target_hand_poses_ = {
+      {Arm::Left,
+       sva::PTransformd(sva::RotY(-M_PI/2), left_grasp_pos)},
+      {Arm::Right,
+       sva::PTransformd(sva::RotY(-M_PI/2), Eigen::Vector3d(left_grasp_pos[0], -left_grasp_pos[1], left_grasp_pos[2]))}};
   }
 
   // setup logger and GUI
@@ -135,84 +139,84 @@ void states::RunStabilizer::runState()
     case Phase::StandBy:
       // requests go_next_ even in auto_mode_ at the start
       if (gripperCompleted(ctl) && go_next_) {
-        goToNextPhase();
-      }
-      break;
-    case Phase::ReachWayPointInit:
-      updateGuiAfterStart(ctl);
-      for (auto arm : BOTH_ARMS) {
-        imp_tasks_.at(arm)->desiredPose(
-            sva::PTransformd(
-                sva::RotY(-M_PI/2),
-                target_hand_poss_.at(arm) - approach_dist_ * Eigen::Vector3d::UnitX()));
-      }
-      goToNextPhase();
-      break;
-    case Phase::ReachWayPointWait:
-      if (handReached(1e-1, 1e-2)) {
         goToNextPhaseWithCheck();
       }
       break;
-    case Phase::ReachTargetInit:
-      for (auto arm : BOTH_ARMS) {
-        imp_tasks_.at(arm)->desiredPose(
-            sva::PTransformd(sva::RotY(-M_PI/2), target_hand_poss_.at(arm)));
+    case Phase::ReachWayPoint:
+      if (phase_switched_) {
+        updateGuiStartReach(ctl);
+        for (auto arm : BOTH_ARMS) {
+          imp_tasks_.at(arm)->desiredPose(
+              sva::PTransformd((approach_dist_ * Eigen::Vector3d::UnitZ()).eval()) * target_hand_poses_.at(arm));
+        }
+        phase_switched_ = false;
+      } else if (handReached(1e-1, 1e-2)) {
+        goToNextPhaseWithCheck();
       }
-      goToNextPhase();
       break;
-    case Phase::ReachTargetWait:
-      if (handReached()) {
+    case Phase::ReachTarget:
+      if (phase_switched_) {
+        for (auto arm : BOTH_ARMS) {
+          imp_tasks_.at(arm)->desiredPose(target_hand_poses_.at(arm));
+        }
+        phase_switched_ = false;
+      } else if (handReached()) {
         goToNextPhaseWithCheck();
       }
       break;
     case Phase::GraspObj:
-      // store hand pose relative to foot midpose
-      {
-        sva::PTransformd foot_midpose = footMidpose(ctl);
+      if (phase_switched_) {
+        if (grasp_obj_) {
+          for (auto & g : ctl.robot().grippers()) {
+            g.get().setTargetOpening(0.0);
+          }
+        }
+        phase_switched_ = false;
+      } else if (gripperCompleted(ctl)) {
+        goToNextPhase();
+      }
+      break;
+    case Phase::Hold:
+      if (phase_switched_) {
+        // store hand pose relative to foot midpose
         rel_target_hand_poses_.clear();
         for (auto arm : BOTH_ARMS) {
           rel_target_hand_poses_.emplace(
               arm,
-              imp_tasks_.at(arm)->desiredPose() * foot_midpose.inv());
+              imp_tasks_.at(arm)->desiredPose() * footMidpose(ctl).inv());
         }
-      }
-
-      if (grasp_obj_) {
-        for (auto & g : ctl.robot().grippers()) {
-          g.get().setTargetOpening(0.0);
-        }
-      }
-
-      goToNextPhase();
-      break;
-    case Phase::Hold:
-      {
-        sva::PTransformd foot_midpose = footMidpose(ctl);
+        updateGuiStartHold(ctl);
+        phase_switched_ = false;
+      } else {
         for (auto arm : BOTH_ARMS) {
-          imp_tasks_.at(arm)->desiredPose(rel_target_hand_poses_.at(arm) * foot_midpose);
+          imp_tasks_.at(arm)->desiredPose(rel_target_hand_poses_.at(arm) * footMidpose(ctl));
+        }
+        if (finish_locomanip_) {
+          updateGuiFinishHold(ctl);
+          goToNextPhaseWithCheck();
         }
       }
-      goToNextPhaseWithCheck();
       break;
     case Phase::UngraspObj:
-      if (grasp_obj_) {
-        for (auto & g : ctl.robot().grippers()) {
-          g.get().setTargetOpening(1.0);
+      if (phase_switched_) {
+        if (grasp_obj_) {
+          for (auto & g : ctl.robot().grippers()) {
+            g.get().setTargetOpening(1.0);
+          }
         }
+        phase_switched_ = false;
+      } else if (gripperCompleted(ctl)) {
+        goToNextPhaseWithCheck();
       }
-      goToNextPhaseWithCheck();
       break;
-    case Phase::ReleaseWayPointInit:
-      for (auto arm : BOTH_ARMS) {
-        imp_tasks_.at(arm)->desiredPose(
-            sva::PTransformd(
-                sva::RotY(-M_PI/2),
-                target_hand_poss_.at(arm) - approach_dist_ * Eigen::Vector3d::UnitX()));
-      }
-      goToNextPhase();
-      break;
-    case Phase::ReleaseWayPointWait:
-      if (handReached(1e-1, 1e-2)) {
+    case Phase::ReleaseWayPoint:
+      if (phase_switched_) {
+        for (auto arm : BOTH_ARMS) {
+          imp_tasks_.at(arm)->desiredPose(
+              sva::PTransformd((approach_dist_ * Eigen::Vector3d::UnitZ()).eval()) * imp_tasks_.at(arm)->desiredPose());
+        }
+        phase_switched_ = false;
+      } else if (handReached(1e-1, 1e-2)) {
         goToNextPhaseWithCheck();
       }
       break;
@@ -315,21 +319,6 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
       mc_rtc::gui::Label("Current", [this]() { return toString(phase_); }),
       mc_rtc::gui::Label("Next", [this]() { return toString(nextPhase(phase_)); }),
       mc_rtc::gui::Button("Go next", [this]() { go_next_ = true; }));
-
-  ctl.gui()->addElement(
-      {"Locomanip", "General"}, mc_rtc::gui::ElementsStacking::Horizontal,
-      mc_rtc::gui::Button(
-          "Open gripper", [this, &ctl]() {
-            for (auto & g : ctl.robot().grippers()) {
-              g.get().setTargetOpening(1.0);
-            }
-          }),
-      mc_rtc::gui::Button(
-          "Close gripper", [this, &ctl]() {
-            for (auto & g : ctl.robot().grippers()) {
-              g.get().setTargetOpening(0.0);
-            }
-          }));
 
   ctl.gui()->addElement(
       {"Locomanip", "ExtWrench"},
@@ -437,7 +426,21 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
           }));
 
   ctl.gui()->addElement(
-      {"Locomanip", "Contact"},
+      {"Locomanip", "Utility"}, mc_rtc::gui::ElementsStacking::Horizontal,
+      mc_rtc::gui::Button(
+          "Open gripper", [this, &ctl]() {
+            for (auto & g : ctl.robot().grippers()) {
+              g.get().setTargetOpening(1.0);
+            }
+          }),
+      mc_rtc::gui::Button(
+          "Close gripper", [this, &ctl]() {
+            for (auto & g : ctl.robot().grippers()) {
+              g.get().setTargetOpening(0.0);
+            }
+          }));
+  ctl.gui()->addElement(
+      {"Locomanip", "Utility"},
       mc_rtc::gui::Button(
           "Add contacts of both hands", [this, &ctl]() {
             for (const auto c : hand_contacts_) {
@@ -454,14 +457,43 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
   ctl.gui()->addElement(
       {"Locomanip", "Configuration"},
       mc_rtc::gui::Label("AutoMode", [this]() { return auto_mode_; }),
-      mc_rtc::gui::Label("GraspObj", [this]() { return grasp_obj_; }));
+      mc_rtc::gui::Label("GraspObj", [this]() { return grasp_obj_; }),
+      mc_rtc::gui::Label("PublishCnoid", [this]() { return publish_cnoid_; }));
 }
 
-void states::RunStabilizer::updateGuiAfterStart(mc_control::fsm::Controller & ctl)
+void states::RunStabilizer::updateGuiStartReach(mc_control::fsm::Controller & ctl)
 {
+  if (std::find(once_flags_.begin(), once_flags_.end(), "updateGuiStartReach") != once_flags_.end()) {
+    return;
+  }
+
   if (auto_mode_) {
     ctl.gui()->removeElement({"Locomanip"}, "Go next");
   }
+  once_flags_.push_back("updateGuiStartReach");
+}
+
+void states::RunStabilizer::updateGuiStartHold(mc_control::fsm::Controller & ctl)
+{
+  if (std::find(once_flags_.begin(), once_flags_.end(), "updateGuiStartHold") != once_flags_.end()) {
+    return;
+  }
+
+  ctl.gui()->addElement(
+      {"Locomanip"},
+      mc_rtc::gui::Button(
+          "Finish locomanip", [this]() { finish_locomanip_ = true; }));
+  once_flags_.push_back("updateGuiStartHold");
+}
+
+void states::RunStabilizer::updateGuiFinishHold(mc_control::fsm::Controller & ctl)
+{
+  if (std::find(once_flags_.begin(), once_flags_.end(), "updateGuiFinishHold") != once_flags_.end()) {
+    return;
+  }
+
+  ctl.gui()->removeElement({"Locomanip"}, "Finish locomanip");
+  once_flags_.push_back("updateGuiFinishHold");
 }
 
 } // namespace lipm_walking
