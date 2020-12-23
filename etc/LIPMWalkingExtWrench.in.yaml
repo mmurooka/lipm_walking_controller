@@ -1227,8 +1227,8 @@ StatesLibraries:
 - "@MC_STATES_LIBRARY_INSTALL_PREFIX@"
 Managed: false
 StepByStep: false
-autoplay: true
-# autoplay: false # for real robot
+# autoplay: true
+autoplay: false # for real robot
 init: Initial
 states:
   WalkInternal:
@@ -1260,22 +1260,22 @@ ObserverPipelines:
       update: false
 
 RunStabilizerConfig:
-  AutoMode: true
+  AutoMode: false
   GraspObj: true
   HandForceRateLimit: 50.0
   ApproachDist: 0.2
   PublishCnoid: true
   Obj:
-    #### Box ####
-    ReachType: wall
-    ObjPose:
-      pos: [0.6, 0, 0.9]
-    ObjToHandPoseLeft:
-      pos: [0, 0.5, 0]
-      rot: [0, 1, 0, -1.57]
-    ObjToHandPoseRight:
-      pos: [0, -0.5, 0]
-      rot: [0, 1, 0, -1.57]
+    # #### Box ####
+    # ReachType: wall
+    # ObjPose:
+    #   pos: [0.6, 0, 0.9]
+    # ObjToHandPoseLeft:
+    #   pos: [0, 0.5, 0]
+    #   rot: [0, 1, 0, -1.57]
+    # ObjToHandPoseRight:
+    #   pos: [0, -0.5, 0]
+    #   rot: [0, 1, 0, -1.57]
     # #### ConstructionPipe ####
     # ReachType: wall
     # ObjPose:
@@ -1286,16 +1286,16 @@ RunStabilizerConfig:
     # ObjToHandPoseRight:
     #   pos: [0, -0.46, 0]
     #   rot: [0, 1, 0, -1.57]
-    # #### Bobbin ####
-    # ReachType: bobbin
-    # ObjPose:
-    #   pos: [1.2, 0, 0.665]
-    #   rot: [1, 0, 0, 0]
-    # ObjToHandPoseLeft:
-    #   pos: [0, 0.18, 0]
-    #   rot: [-0.357407, -0.862856, -0.357407, 1.71777]
-    # ObjToHandPoseRight:
-    #   pos: [0, -0.18, 0]
-    #   rot: [0.357407, -0.862856, 0.357407, 1.71777]
-    # RollingRadius: 0.665
-    # RollingAngle: 0.523599
+    #### Bobbin ####
+    ReachType: bobbin
+    ObjPose:
+      pos: [1.2, 0, 0.665]
+      rot: [1, 0, 0, 0]
+    ObjToHandPoseLeft:
+      pos: [0, 0.18, 0]
+      rot: [-0.357407, -0.862856, -0.357407, 1.71777]
+    ObjToHandPoseRight:
+      pos: [0, -0.18, 0]
+      rot: [0.357407, -0.862856, 0.357407, 1.71777]
+    RollingRadius: 0.665
+    RollingAngle: 0.523599
