@@ -299,36 +299,40 @@ bool states::RunStabilizer::checkTransitions()
 
 void states::RunStabilizer::setupLogger(mc_control::fsm::Controller & ctl)
 {
-  ctl.logger().addLogEntry("HandForceTest_phase",
+  ctl.logger().addLogEntry("Locomanip_phase",
                            [this]() { return static_cast<int>(phase_); });
-  ctl.logger().addLogEntry("HandForceTest_TargetWrench_LeftHand",
+  ctl.logger().addLogEntry("Locomanip_TargetWrench_LeftHand",
                            [this]() -> const sva::ForceVecd
                            { return target_hand_wrenches_.at(Arm::Left); });
 
-  ctl.logger().addLogEntry("HandForceTest_TargetWrench_RightHand",
+  ctl.logger().addLogEntry("Locomanip_TargetWrench_RightHand",
                            [this]() -> const sva::ForceVecd
                            { return target_hand_wrenches_.at(Arm::Right); });
 
-  ctl.logger().addLogEntry("HandForceTest_MeasuredWrench_LeftHand",
+  ctl.logger().addLogEntry("Locomanip_MeasuredWrench_LeftHand",
                            [&ctl]() -> const sva::ForceVecd
                            { return ctl.robot().surfaceWrench("LeftHand"); });
 
-  ctl.logger().addLogEntry("HandForceTest_MeasuredWrench_RightHand",
+  ctl.logger().addLogEntry("Locomanip_MeasuredWrench_RightHand",
                            [&ctl]() -> const sva::ForceVecd
                            { return ctl.robot().surfaceWrench("RightHand"); });
 }
 
 void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
 {
-  if (!auto_mode_) {
+  if (auto_mode_) {
     ctl.gui()->addElement(
-        {"HandForceTest"}, mc_rtc::gui::ElementsStacking::Horizontal,
+        {"Locomanip"},
+        mc_rtc::gui::Label("Next phase", [this]() { return toString(nextPhase(phase_)); }));
+  } else {
+    ctl.gui()->addElement(
+        {"Locomanip"}, mc_rtc::gui::ElementsStacking::Horizontal,
         mc_rtc::gui::Label("Next phase", [this]() { return toString(nextPhase(phase_)); }),
         mc_rtc::gui::Button("Go to next phase", [this]() { go_next_ = true; }));
   }
 
   ctl.gui()->addElement(
-      {"HandForceTest"}, mc_rtc::gui::ElementsStacking::Horizontal,
+      {"Locomanip", "General"}, mc_rtc::gui::ElementsStacking::Horizontal,
       mc_rtc::gui::Button(
           "Open gripper", [this, &ctl]() {
             for (auto & g : ctl.robot().grippers()) {
@@ -345,7 +349,7 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
           }));
 
   ctl.gui()->addElement(
-      {"HandForceTest", "Force"},
+      {"Locomanip", "ExtWrench"},
       mc_rtc::gui::NumberInput(
           "Hand force rate limit",
           [this]() { return hand_force_rate_limit_; },
@@ -355,15 +359,9 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
                               hand_force_rate_limit_);
           }),
       mc_rtc::gui::ArrayInput(
-          "Both hands force",
+          "Both hands target force",
           {"x", "y", "z"},
-          [this]() -> const Eigen::Vector3d {
-            if ((interp_hand_forces_.at(Arm::Left) - interp_hand_forces_.at(Arm::Right)).norm() < 1e-10) {
-              return interp_hand_forces_.at(Arm::Left);
-            } else {
-              return Eigen::Vector3d::Zero();
-            }
-          },
+          [this]() -> const Eigen::Vector3d { return interp_hand_forces_.at(Arm::Left); },
           [this](const Eigen::Vector3d& v) {
             goal_hand_forces_.at(Arm::Left) = v;
             goal_hand_forces_.at(Arm::Right) = v;
@@ -371,7 +369,7 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
                               goal_hand_forces_.at(Arm::Left).transpose());
           }),
       mc_rtc::gui::ArrayInput(
-          "Left hand force",
+          "Left hand target force",
           {"x", "y", "z"},
           [this]() { return interp_hand_forces_.at(Arm::Left); },
           [this](const Eigen::Vector3d& v) {
@@ -380,16 +378,41 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
                               goal_hand_forces_.at(Arm::Left).transpose());
           }),
       mc_rtc::gui::ArrayInput(
-          "Right hand force",
+          "Right hand target force",
           {"x", "y", "z"},
           [this]() { return interp_hand_forces_.at(Arm::Right); },
           [this](const Eigen::Vector3d& v) {
             goal_hand_forces_.at(Arm::Right) = v;
             mc_rtc::log::info("[RunStabilizer] right_hand_force is changed to {}.",
                               goal_hand_forces_.at(Arm::Right).transpose());
-          }),
+          }));
+
+  if (publish_cnoid_) {
+    ctl.gui()->addElement(
+        {"Locomanip", "ExtWrench"},
+        mc_rtc::gui::ArrayInput(
+            "Cnoid external force offset",
+            {"x", "y", "z"},
+            [this]() -> const Eigen::Vector3d { return interp_cnoid_ext_force_offset_; },
+            [this](const Eigen::Vector3d& v) {
+              goal_cnoid_ext_force_offset_ = v;
+              mc_rtc::log::info("[RunStabilizer] cnoid_ext_force_offset is changed to {}.",
+                                goal_cnoid_ext_force_offset_.transpose());
+            }));
+  }
+
+  ctl.gui()->addElement(
+      {"Locomanip", "Impedance"},
+      mc_rtc::gui::ArrayLabel(
+          "Left hand filtered force",
+          {"x", "y", "z"},
+          [this]() { return imp_tasks_.at(Arm::Left)->filteredMeasuredWrench().force(); }),
+      mc_rtc::gui::ArrayLabel(
+          "Right hand filtered force",
+          {"x", "y", "z"},
+          [this]() { return imp_tasks_.at(Arm::Right)->filteredMeasuredWrench().force(); }),
       mc_rtc::gui::ArrayInput(
-          "impedance",
+          "impedancePosition",
           {"M", "D", "K"},
           [this]() {
             return Eigen::Vector3d(
@@ -408,7 +431,7 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
                               v.transpose());
           }),
       mc_rtc::gui::ArrayInput(
-          "impedanceZAxis",
+          "impedancePosition Z-axis",
           {"M", "D", "K"},
           [this]() {
             return Eigen::Vector3d(
@@ -428,19 +451,10 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
             }
             mc_rtc::log::info("[RunStabilizer] Z-Axis impedance is changed to {}.",
                               v.transpose());
-          }),
-      mc_rtc::gui::ArrayInput(
-          "Cnoid external force offset",
-          {"x", "y", "z"},
-          [this]() -> const Eigen::Vector3d { return interp_cnoid_ext_force_offset_; },
-          [this](const Eigen::Vector3d& v) {
-            goal_cnoid_ext_force_offset_ = v;
-            mc_rtc::log::info("[RunStabilizer] cnoid_ext_force_offset is changed to {}.",
-                              goal_cnoid_ext_force_offset_.transpose());
           }));
 
   ctl.gui()->addElement(
-      {"HandForceTest", "Contact"},
+      {"Locomanip", "Contact"},
       mc_rtc::gui::Button(
           "Add contacts of both hands", [this, &ctl]() {
             for (const auto c : hand_contacts_) {
@@ -455,7 +469,7 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
           }));
 
   ctl.gui()->addElement(
-      {"HandForceTest", "Configuration"},
+      {"Locomanip", "Configuration"},
       mc_rtc::gui::Checkbox(
           "AutoMode",
           [this]() { return auto_mode_; },
@@ -467,11 +481,7 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
       mc_rtc::gui::Checkbox(
           "EnableImpedance",
           [this]() { return enable_impedance_; },
-          [this]() { enable_impedance_ = !enable_impedance_; }),
-      mc_rtc::gui::Checkbox(
-          "PublishCnoid",
-          [this]() { return publish_cnoid_; },
-          [this]() { publish_cnoid_ = !publish_cnoid_; }));
+          [this]() { enable_impedance_ = !enable_impedance_; }));
 }
 
 } // namespace lipm_walking
