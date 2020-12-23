@@ -49,10 +49,10 @@ void states::RunStabilizer::start()
       const auto stabilizer_config = ctl.config()("RunStabilizerConfig");
       stabilizer_config("AutoMode", auto_mode_);
       stabilizer_config("GraspObj", grasp_obj_);
+      stabilizer_config("LeftGraspPos", left_grasp_pos);
       stabilizer_config("HandForceRateLimit", hand_force_rate_limit_);
       stabilizer_config("ApproachDist", approach_dist_);
       stabilizer_config("PublishCnoid", publish_cnoid_);
-      stabilizer_config("LeftGraspPos", left_grasp_pos);
     }
     target_hand_poses_ = {
       {Arm::Left,
@@ -242,6 +242,7 @@ void states::RunStabilizer::runState()
     geometry_msgs::Vector3Stamped wall_force_command_msg;
     Eigen::Vector3d wall_force_command = Eigen::Vector3d::Zero();
     for (auto arm : BOTH_ARMS) {
+      // find parent-side of the hand surface because the joint need to be specified in choreonoid
       std::string joint_name = "";
       {
         const auto & mb = ctl.robot().mb();
@@ -270,9 +271,8 @@ void states::RunStabilizer::runState()
       ext_force_arr_msg.forces.push_back(ext_force_msg);
       wall_force_command += forceW + interp_cnoid_ext_force_offset_;
     }
+    tf::vectorEigenToMsg(wall_force_command, wall_force_command_msg.vector);
     cnoid_ext_force_pub_.publish(ext_force_arr_msg);
-    tf::vectorEigenToMsg(
-        wall_force_command, wall_force_command_msg.vector);
     cnoid_wall_force_pub_.publish(wall_force_command_msg);
   }
 }
