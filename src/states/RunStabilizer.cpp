@@ -90,15 +90,22 @@ void states::RunStabilizer::start()
 
   // setup StabilizerTask
   ctl.solver().addTask(stabilizer());
-  // use only fz of measured wrench to make it robust agaist contact errors
+  // \todo enable to specify through the configuration
+  // use only fy of measured wrench to make it robust agaist contact errors
   stabilizer()->extWrenchGain(
-      sva::MotionVecd(Eigen::Vector3d::Zero(), Eigen::Vector3d(0., 0., 1.)));
+      sva::MotionVecd(Eigen::Vector3d::Zero(), Eigen::Vector3d(0., 1., 0.)));
+  // use only fz of measured wrench to make it robust agaist contact errors
+  // stabilizer()->extWrenchGain(
+  //     sva::MotionVecd(Eigen::Vector3d::Zero(), Eigen::Vector3d(0., 0., 1.)));
 
   // setup ImpedanceTask
   {
     sva::ForceVecd impM(Eigen::Vector3d::Constant(2.0), Eigen::Vector3d(10.0, 10.0, 10.0));
-    sva::ForceVecd impD(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 1000.0, 1500.0));
-    sva::ForceVecd impK(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 1000.0, 100.0));
+    sva::ForceVecd impD(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 1500.0, 1500.0));
+    sva::ForceVecd impK(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 200.0, 200.0));
+    // sva::ForceVecd impM(Eigen::Vector3d::Constant(2.0), Eigen::Vector3d(10.0, 10.0, 10.0));
+    // sva::ForceVecd impD(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 1000.0, 1500.0));
+    // sva::ForceVecd impK(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 1000.0, 100.0));
     imp_tasks_.clear();
     for (auto arm : BOTH_ARMS) {
       auto imp_task = std::make_shared<mc_tasks::force::ImpedanceTask>(

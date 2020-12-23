@@ -11,6 +11,7 @@
 #include <lipm_walking/State.h>
 
 #include <mc_rtc/ros.h>
+#include <mc_rbdyn/rpy_utils.h>
 #include <mc_tasks/ImpedanceTask.h>
 #include <ros/ros.h>
 
@@ -167,10 +168,7 @@ struct RunStabilizer : State
   {
     Eigen::Vector3d pos = pose.translation();
     pos[2] = 0;
-    return sva::PTransformd(
-        sva::RotZ(std::acos(Eigen::Vector3d::UnitX().dot(
-            pose.rotation() * Eigen::Vector3d::UnitX()))),
-        pos);
+    return sva::PTransformd(sva::RotZ(mc_rbdyn::rpyFromMat(pose.rotation())[2]), pos);
   }
 
   inline sva::PTransformd footMidpose(mc_control::fsm::Controller & ctl) const
