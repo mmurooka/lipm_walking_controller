@@ -30,12 +30,10 @@ states::RunStabilizer::RunStabilizer():
   }
 
   // setup ROS
-  if (publish_cnoid_ ) {
-    cnoid_ext_force_pub_ = nh_->advertise<hwm_msgs::CnoidExternalForceArray>(
-        "cnoid/external_force", 1, true);
-    cnoid_wall_force_pub_ = nh_->advertise<geometry_msgs::Vector3Stamped>(
-        "cnoid/wall_force_command", 1, true);
-  }
+  cnoid_ext_force_pub_ = nh_->advertise<hwm_msgs::CnoidExternalForceArray>(
+      "cnoid/external_force", 1, true);
+  cnoid_wall_force_pub_ = nh_->advertise<geometry_msgs::Vector3Stamped>(
+      "cnoid/wall_force_command", 1, true);
 }
 
 void states::RunStabilizer::start()
