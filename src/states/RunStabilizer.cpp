@@ -41,22 +41,47 @@ void states::RunStabilizer::start()
   auto & ctl = controller();
 
   // read configuration
+  if (ctl.config().has("RunStabilizerConfig")) {
+    const auto config = ctl.config()("RunStabilizerConfig");
+    config("AutoMode", auto_mode_);
+    config("GraspObj", grasp_obj_);
+    config("HandForceRateLimit", hand_force_rate_limit_);
+    config("ApproachDist", approach_dist_);
+    config("PublishCnoid", publish_cnoid_);
+  }
+
+  // setup target hand poses
   {
-    Eigen::Vector3d left_grasp_pos(0.6, 0.5, 1.0);
+    std::string reach_type = "wall";
+    sva::PTransformd obj_pose = sva::PTransformd::Identity();
+    sva::PTransformd obj_to_hand_pose_left = sva::PTransformd::Identity();
+    sva::PTransformd obj_to_hand_pose_right = sva::PTransformd::Identity();
+    double rolling_radius = 1.0;
+    double rolling_angle = 0.0;
     if (ctl.config().has("RunStabilizerConfig")) {
-      const auto stabilizer_config = ctl.config()("RunStabilizerConfig");
-      stabilizer_config("AutoMode", auto_mode_);
-      stabilizer_config("GraspObj", grasp_obj_);
-      stabilizer_config("LeftGraspPos", left_grasp_pos);
-      stabilizer_config("HandForceRateLimit", hand_force_rate_limit_);
-      stabilizer_config("ApproachDist", approach_dist_);
-      stabilizer_config("PublishCnoid", publish_cnoid_);
+      const auto config = ctl.config()("RunStabilizerConfig");
+      if (config.has("Obj")) {
+        const auto obj_config = config("Obj");
+        obj_config("ReachType", reach_type);
+        loadPTransformd(obj_config, "ObjPose", obj_pose);
+        loadPTransformd(obj_config, "ObjToHandPoseLeft", obj_to_hand_pose_left);
+        loadPTransformd(obj_config, "ObjToHandPoseRight", obj_to_hand_pose_right);
+        obj_config("RollingRadius", rolling_radius);
+        obj_config("RollingAngle", rolling_angle);
+      }
+    }
+    sva::PTransformd hand_midpose = obj_pose;
+    if (reach_type == "wall") {
+    } else if (reach_type == "bobbin") {
+      hand_midpose =
+          sva::PTransformd((-rolling_radius * Eigen::Vector3d::UnitX()).eval()) *
+          sva::PTransformd(sva::RotY(rolling_angle)) * obj_pose;
+    } else {
+      mc_rtc::log::error_and_throw<std::runtime_error>("[RunStabilizer] Unknown reach_type: {}", reach_type);
     }
     target_hand_poses_ = {
-      {Arm::Left,
-       sva::PTransformd(sva::RotY(-M_PI/2), left_grasp_pos)},
-      {Arm::Right,
-       sva::PTransformd(sva::RotY(-M_PI/2), Eigen::Vector3d(left_grasp_pos[0], -left_grasp_pos[1], left_grasp_pos[2]))}};
+      {Arm::Left, obj_to_hand_pose_left * hand_midpose},
+      {Arm::Right, obj_to_hand_pose_right * hand_midpose}};
   }
 
   // setup logger and GUI
@@ -438,7 +463,7 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
             }
           }));
   ctl.gui()->addElement(
-      {"Locomanip", "Utility"},
+      {"Locomanip", "Utility"}, mc_rtc::gui::ElementsStacking::Horizontal,
       mc_rtc::gui::Button(
           "Add contacts of both hands", [this, &ctl]() {
             for (const auto c : hand_contacts_) {

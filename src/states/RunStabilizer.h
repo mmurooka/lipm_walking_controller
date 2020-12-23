@@ -17,6 +17,28 @@
 namespace lipm_walking
 {
 
+inline void loadPTransformd(const mc_rtc::Configuration & config,
+                            const std::string & key,
+                            sva::PTransformd & pose)
+{
+  if (!config.has(key)) {
+    return;
+  }
+
+  const mc_rtc::Configuration & pose_config = config(key);
+
+  // set translation
+  Eigen::Vector3d pos = Eigen::Vector3d::Zero();
+  pose_config("pos", pos);
+  pose.translation() = pos;
+
+  // set rotation (axis-angle representation)
+  Eigen::VectorXd rot_vec(4);
+  rot_vec << 1, 0, 0, 0;
+  pose_config("rot", rot_vec);
+  pose.rotation() = Eigen::AngleAxisd(rot_vec[3], rot_vec.segment(0, 3)).toRotationMatrix().transpose();
+}
+
 namespace states
 {
 
@@ -130,7 +152,7 @@ struct RunStabilizer : State
     return true;
   }
 
-  inline bool handReached(double evalThre = 5e-2, double speedThre = 1e-3) const
+  inline bool handReached(double evalThre = 5e-2, double speedThre = 5e-3) const
   {
     for (auto arm : BOTH_ARMS) {
       if ((imp_tasks_.at(arm)->eval().norm()) > evalThre ||
