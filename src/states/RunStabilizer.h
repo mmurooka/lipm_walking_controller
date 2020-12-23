@@ -122,10 +122,15 @@ struct RunStabilizer : State
     }
   }
 
-  inline bool handReached(double thre = 1e-2)
+  inline bool handReached(double evalThre = 5e-2, double speedThre = 1e-3)
   {
-    return (imp_tasks_.at(Arm::Left)->eval().norm() < thre) &&
-        (imp_tasks_.at(Arm::Right)->eval().norm() < thre);
+    for (auto arm : BOTH_ARMS) {
+      if ((imp_tasks_.at(arm)->eval().norm()) > evalThre ||
+          (imp_tasks_.at(arm)->speed().norm() > speedThre)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   inline sva::PTransformd projGround(const sva::PTransformd& pose) const
