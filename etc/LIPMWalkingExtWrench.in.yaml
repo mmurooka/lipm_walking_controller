@@ -710,9 +710,9 @@ plans:
         #     translation: [0.0, 0.105, 0.0]
         #   surface: LeftFootCenter
     bobbin_turn_left_1: # turning bobbin B1330 left
-      double_support_duration: 0.2
+      double_support_duration: 0.8
       single_support_duration: 0.8
-      swing_height: 0.04
+      swing_height: 0.05
       contacts:
         - pose: [1.0, 0.0, 0.0, 0.0, 0.0, 0.105, 0.0]
           surface: LeftFootCenter
@@ -723,9 +723,26 @@ plans:
         - pose: [0.9978589232386035, 0.0, 0.0, 0.06540312923014305, -0.0034390838316777847, 0.052529720219811796, 0.0]
           surface: RightFootCenter
     bobbin_turn_left_2: # turning bobbin B1330 left
-      double_support_duration: 0.2
+      double_support_duration: 0.8
       single_support_duration: 0.8
-      swing_height: 0.04
+      swing_height: 0.05
+      contacts:
+        - pose: [1.0, 0.0, 0.0, 0.0, 0.0, 0.105, 0.0]
+          surface: LeftFootCenter
+        - pose: [1.0, 0.0, 0.0, 0.0, 0.0, -0.105, 0.0]
+          surface: RightFootCenter
+        - pose: [0.9978589232386035, 0.0, 0.0, 0.06540312923014305, 0.023971416534533045, 0.26073314110831197, 0.0]
+          surface: LeftFootCenter
+        - pose: [0.9978589232386035, 0.0, 0.0, 0.06540312923014305, -0.0034390838316777847, 0.052529720219811796, 0.0]
+          surface: RightFootCenter
+        - pose: [0.9914448613738104, 0.0, 0.0, 0.1305261922200516, 0.06806500818888261, 0.41200506588337704, 0.0]
+          surface: LeftFootCenter
+        - pose: [0.9914448613738104, 0.0, 0.0, 0.1305261922200516, 0.013713008717353259, 0.20916064236267273, 0.0]
+          surface: RightFootCenter
+    bobbin_turn_left_2_fast: # turning bobbin B1330 left
+      double_support_duration: 0.4
+      single_support_duration: 0.8
+      swing_height: 0.05
       contacts:
         - pose: [1.0, 0.0, 0.0, 0.0, 0.0, 0.105, 0.0]
           surface: LeftFootCenter
@@ -740,9 +757,9 @@ plans:
         - pose: [0.9914448613738104, 0.0, 0.0, 0.1305261922200516, 0.013713008717353259, 0.20916064236267273, 0.0]
           surface: RightFootCenter
     bobbin_turn_left_4: # turning bobbin B1330 left
-      double_support_duration: 0.2
+      double_support_duration: 0.8
       single_support_duration: 0.8
-      swing_height: 0.04
+      swing_height: 0.05
       contacts:
         - pose: [1.0, 0.0, 0.0, 0.0, 0.0, 0.105, 0.0]
           surface: LeftFootCenter
@@ -765,9 +782,9 @@ plans:
         - pose: [0.9659258262890683, 0.0, 0.0, 0.2588190451025207, 0.10826951545867347, 0.5090673326026338, 0.0]
           surface: RightFootCenter
     bobbin_turn_right_1: # turning bobbin B1330 right
-      double_support_duration: 0.2
+      double_support_duration: 0.8
       single_support_duration: 0.8
-      swing_height: 0.04
+      swing_height: 0.05
       contacts:
         - pose: [1.0, 0.0, 0.0, 0.0, 0.0, -0.105, 0.0]
           surface: RightFootCenter
@@ -778,9 +795,9 @@ plans:
         - pose: [0.9978589232386035, 0.0, 0.0, -0.06540312923014305, -0.0034390838316777847, -0.052529720219811796, 0.0]
           surface: LeftFootCenter
     bobbin_turn_right_2: # turning bobbin B1330 right
-      double_support_duration: 0.2
+      double_support_duration: 0.8
       single_support_duration: 0.8
-      swing_height: 0.04
+      swing_height: 0.05
       contacts:
         - pose: [1.0, 0.0, 0.0, 0.0, 0.0, -0.105, 0.0]
           surface: RightFootCenter
@@ -795,9 +812,9 @@ plans:
         - pose: [0.9914448613738104, 0.0, 0.0, -0.1305261922200516, 0.013713008717353259, -0.20916064236267273, 0.0]
           surface: LeftFootCenter
     bobbin_turn_right_4: # turning bobbin B1330 right
-      double_support_duration: 0.2
+      double_support_duration: 0.8
       single_support_duration: 0.8
-      swing_height: 0.04
+      swing_height: 0.05
       contacts:
         - pose: [1.0, 0.0, 0.0, 0.0, 0.0, -0.105, 0.0]
           surface: RightFootCenter
