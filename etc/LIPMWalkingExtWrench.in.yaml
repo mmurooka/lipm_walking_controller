@@ -1277,25 +1277,26 @@ ObserverPipelines:
       update: false
 
 RunStabilizerConfig:
-  AutoMode: false
-  GraspObj: true
+  AutoMode: true # false
   HandForceRateLimit: 50.0
   ApproachDist: 0.2
   PublishCnoid: true
   Obj:
-    # #### Box ####
-    # ReachType: wall
-    # ObjPose:
-    #   pos: [0.6, 0, 0.9]
-    # ObjToHandPoseLeft:
-    #   pos: [0, 0.5, 0]
-    #   rot: [0, 1, 0, -1.57]
-    # ObjToHandPoseRight:
-    #   pos: [0, -0.5, 0]
-    #   rot: [0, 1, 0, -1.57]
-    # extWrenchGain: [0, 0, 1]
+    #### Box ####
+    ReachType: wall
+    GraspObj: false # true
+    ObjPose:
+      pos: [0.6, 0, 0.9]
+    ObjToHandPoseLeft:
+      pos: [0, 0.5, 0]
+      rot: [0, 1, 0, -1.57]
+    ObjToHandPoseRight:
+      pos: [0, -0.5, 0]
+      rot: [0, 1, 0, -1.57]
+    extWrenchGain: [0, 0, 1]
     # #### ConstructionPipe ####
     # ReachType: wall
+    # GraspObj: true
     # ObjPose:
     #   pos: [0.6, 0, 1.1]
     # ObjToHandPoseLeft:
@@ -1305,17 +1306,24 @@ RunStabilizerConfig:
     #   pos: [0, -0.46, 0]
     #   rot: [0, 1, 0, -1.57]
     # extWrenchGain: [0, 0, 1]
-    #### Bobbin ####
-    ReachType: bobbin
-    ObjPose:
-      pos: [1.2, 0, 0.665]
-      rot: [1, 0, 0, 0]
-    ObjToHandPoseLeft:
-      pos: [0, 0.18, 0]
-      rot: [-0.357407, -0.862856, -0.357407, 1.71777]
-    ObjToHandPoseRight:
-      pos: [0, -0.18, 0]
-      rot: [0.357407, -0.862856, 0.357407, 1.71777]
-    RollingRadius: 0.665
-    RollingAngle: 0.523599
-    extWrenchGain: [0, 1, 0]
+    # impMPos: [10.0, 10.0, 10.0]
+    # impDPos: [1000.0, 1000.0, 1500.0]
+    # impKPos: [1000.0, 1000.0, 100.0]
+    # #### Bobbin ####
+    # ReachType: bobbin
+    # GraspObj: true
+    # ObjPose:
+    #   pos: [1.2, 0, 0.665]
+    #   rot: [1, 0, 0, 0]
+    # ObjToHandPoseLeft:
+    #   pos: [0, 0.18, 0]
+    #   rot: [-0.357407, -0.862856, -0.357407, 1.71777]
+    # ObjToHandPoseRight:
+    #   pos: [0, -0.18, 0]
+    #   rot: [0.357407, -0.862856, 0.357407, 1.71777]
+    # RollingRadius: 0.665
+    # RollingAngle: 0.523599
+    # extWrenchGain: [0, 1, 0]
+    # impMPos: [10.0, 10.0, 10.0]
+    # impDPos: [1000.0, 1500.0, 1500.0]
+    # impKPos: [1000.0, 200.0, 200.0]

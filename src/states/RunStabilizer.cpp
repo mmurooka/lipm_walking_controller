@@ -44,7 +44,6 @@ void states::RunStabilizer::start()
   if (ctl.config().has("RunStabilizerConfig")) {
     const auto config = ctl.config()("RunStabilizerConfig");
     config("AutoMode", auto_mode_);
-    config("GraspObj", grasp_obj_);
     config("HandForceRateLimit", hand_force_rate_limit_);
     config("ApproachDist", approach_dist_);
     config("PublishCnoid", publish_cnoid_);
@@ -63,6 +62,7 @@ void states::RunStabilizer::start()
       if (config.has("Obj")) {
         const auto obj_config = config("Obj");
         obj_config("ReachType", reach_type);
+        obj_config("GraspObj", grasp_obj_);
         loadPTransformd(obj_config, "ObjPose", obj_pose);
         loadPTransformd(obj_config, "ObjToHandPoseLeft", obj_to_hand_pose_left);
         loadPTransformd(obj_config, "ObjToHandPoseRight", obj_to_hand_pose_right);
@@ -89,27 +89,39 @@ void states::RunStabilizer::start()
   setupGui(ctl);
 
   // setup StabilizerTask
-  ctl.solver().addTask(stabilizer());
+  {
+    ctl.solver().addTask(stabilizer());
 
-  Eigen::Vector3d ext_wrench_gain = Eigen::Vector3d::Ones();
-  if (ctl.config().has("RunStabilizerConfig")) {
-    const auto config = ctl.config()("RunStabilizerConfig");
-    if (config.has("Obj")) {
-      const auto obj_config = config("Obj");
-      obj_config("extWrenchGain", ext_wrench_gain);
+    Eigen::Vector3d ext_wrench_gain = Eigen::Vector3d::Ones();
+    if (ctl.config().has("RunStabilizerConfig")) {
+      const auto config = ctl.config()("RunStabilizerConfig");
+      if (config.has("Obj")) {
+        const auto obj_config = config("Obj");
+        obj_config("extWrenchGain", ext_wrench_gain);
+      }
     }
+    // use only the specified direction component of measured wrench to make it robust against contact errors
+    stabilizer()->extWrenchGain(sva::MotionVecd(Eigen::Vector3d::Zero(), ext_wrench_gain));
   }
-  // use only the specified direction component of measured wrench to make it robust against contact errors
-  stabilizer()->extWrenchGain(sva::MotionVecd(Eigen::Vector3d::Zero(), ext_wrench_gain));
 
   // setup ImpedanceTask
   {
-    sva::ForceVecd impM(Eigen::Vector3d::Constant(2.0), Eigen::Vector3d(10.0, 10.0, 10.0));
-    sva::ForceVecd impD(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 1500.0, 1500.0));
-    sva::ForceVecd impK(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 200.0, 200.0));
-    // sva::ForceVecd impM(Eigen::Vector3d::Constant(2.0), Eigen::Vector3d(10.0, 10.0, 10.0));
-    // sva::ForceVecd impD(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 1000.0, 1500.0));
-    // sva::ForceVecd impK(Eigen::Vector3d::Constant(200.0), Eigen::Vector3d(1000.0, 1000.0, 100.0));
+    Eigen::Vector3d impMPos = Eigen::Vector3d::Constant(10.0);
+    Eigen::Vector3d impDPos = Eigen::Vector3d::Constant(1500.0);
+    Eigen::Vector3d impKPos = Eigen::Vector3d::Constant(500.0);
+    if (ctl.config().has("RunStabilizerConfig")) {
+      const auto config = ctl.config()("RunStabilizerConfig");
+      if (config.has("Obj")) {
+        const auto obj_config = config("Obj");
+        obj_config("impMPos", impMPos);
+        obj_config("impDPos", impDPos);
+        obj_config("impKPos", impKPos);
+      }
+    }
+    sva::ForceVecd impM(Eigen::Vector3d::Constant(2.0), impMPos);
+    sva::ForceVecd impD(Eigen::Vector3d::Constant(200.0), impDPos);
+    sva::ForceVecd impK(Eigen::Vector3d::Constant(200.0), impKPos);
+
     imp_tasks_.clear();
     for (auto arm : BOTH_ARMS) {
       auto imp_task = std::make_shared<mc_tasks::force::ImpedanceTask>(
