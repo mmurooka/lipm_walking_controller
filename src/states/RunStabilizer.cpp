@@ -344,11 +344,15 @@ void states::RunStabilizer::setupLogger(mc_control::fsm::Controller & ctl)
 
 void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
 {
+  std::string button_name = "Go next";
+  if (auto_mode_) {
+    button_name = "Start auto";
+  }
   ctl.gui()->addElement(
       {"Locomanip"}, mc_rtc::gui::ElementsStacking::Horizontal,
       mc_rtc::gui::Label("Current", [this]() { return toString(phase_); }),
       mc_rtc::gui::Label("Next", [this]() { return toString(nextPhase(phase_)); }),
-      mc_rtc::gui::Button("Go next", [this]() { go_next_ = true; }));
+      mc_rtc::gui::Button(button_name, [this]() { go_next_ = true; }));
 
   ctl.gui()->addElement(
       {"Locomanip", "ExtWrench"},
@@ -498,7 +502,7 @@ void states::RunStabilizer::updateGuiStartReach(mc_control::fsm::Controller & ct
   }
 
   if (auto_mode_) {
-    ctl.gui()->removeElement({"Locomanip"}, "Go next");
+    ctl.gui()->removeElement({"Locomanip"}, "Start auto");
   }
   once_flags_.push_back("updateGuiStartReach");
 }
