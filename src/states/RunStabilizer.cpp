@@ -90,13 +90,17 @@ void states::RunStabilizer::start()
 
   // setup StabilizerTask
   ctl.solver().addTask(stabilizer());
-  // \todo enable to specify through the configuration
-  // use only fy of measured wrench to make it robust agaist contact errors
-  stabilizer()->extWrenchGain(
-      sva::MotionVecd(Eigen::Vector3d::Zero(), Eigen::Vector3d(0., 1., 0.)));
-  // use only fz of measured wrench to make it robust agaist contact errors
-  // stabilizer()->extWrenchGain(
-  //     sva::MotionVecd(Eigen::Vector3d::Zero(), Eigen::Vector3d(0., 0., 1.)));
+
+  Eigen::Vector3d ext_wrench_gain = Eigen::Vector3d::Ones();
+  if (ctl.config().has("RunStabilizerConfig")) {
+    const auto config = ctl.config()("RunStabilizerConfig");
+    if (config.has("Obj")) {
+      const auto obj_config = config("Obj");
+      obj_config("extWrenchGain", ext_wrench_gain);
+    }
+  }
+  // use only the specified direction component of measured wrench to make it robust against contact errors
+  stabilizer()->extWrenchGain(sva::MotionVecd(Eigen::Vector3d::Zero(), ext_wrench_gain));
 
   // setup ImpedanceTask
   {

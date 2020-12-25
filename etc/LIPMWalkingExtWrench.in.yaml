@@ -1293,6 +1293,7 @@ RunStabilizerConfig:
     # ObjToHandPoseRight:
     #   pos: [0, -0.5, 0]
     #   rot: [0, 1, 0, -1.57]
+    # extWrenchGain: [0, 0, 1]
     # #### ConstructionPipe ####
     # ReachType: wall
     # ObjPose:
@@ -1303,6 +1304,7 @@ RunStabilizerConfig:
     # ObjToHandPoseRight:
     #   pos: [0, -0.46, 0]
     #   rot: [0, 1, 0, -1.57]
+    # extWrenchGain: [0, 0, 1]
     #### Bobbin ####
     ReachType: bobbin
     ObjPose:
@@ -1316,3 +1318,4 @@ RunStabilizerConfig:
       rot: [0.357407, -0.862856, 0.357407, 1.71777]
     RollingRadius: 0.665
     RollingAngle: 0.523599
+    extWrenchGain: [0, 1, 0]
