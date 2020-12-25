@@ -1,66 +1,58 @@
 [
   [
-    "HandForceTest_Com",
+    "Impedance_Fz",
     "t",
     [
-      "lipm_stabilizer_hrp5_p_controlRobot_com_x",
-      "lipm_stabilizer_hrp5_p_realRobot_com_x",
-      "lipm_stabilizer_hrp5_p_realRobot_zmp_x",
-      "lipm_stabilizer_hrp5_p_support_max_x",
-      "lipm_stabilizer_hrp5_p_support_min_x"
+      "impedance_hrp5_p_LeftHand_filteredMeasuredWrench_fz",
+      "impedance_hrp5_p_LeftHand_targetWrench_fz",
+      "impedance_hrp5_p_RightHand_filteredMeasuredWrench_fz",
+      "impedance_hrp5_p_RightHand_targetWrench_fz"
     ],
     [],
     [],
     [],
     {
-      "color": "black",
-      "visible": false,
+      "color": "#000000",
+      "visible": true,
       "linewidth": 0.5,
       "linestyle": "--",
       "label": ""
     },
     {
-      "color": "black",
-      "visible": false,
+      "color": "#000000",
+      "visible": true,
       "linewidth": 0.5,
       "linestyle": "--",
       "label": ""
     },
     {
-      "lipm_stabilizer_hrp5_p_support_min_x": {
-        "color": "#aaff00",
-        "visible": false,
-        "linewidth": 1.0,
-        "linestyle": "--",
-        "label": "lipm_stabilizer_hrp5_p_support_min_x"
-      },
-      "lipm_stabilizer_hrp5_p_controlRobot_com_x": {
-        "color": "#0000ff",
+      "impedance_hrp5_p_RightHand_targetWrench_fz": {
+        "color": "#00ffff",
         "visible": false,
         "linewidth": 3.0,
         "linestyle": "-",
-        "label": "lipm_stabilizer_hrp5_p_controlRobot_com_x"
+        "label": "impedance_hrp5_p_RightHand_targetWrench_fz"
       },
-      "lipm_stabilizer_hrp5_p_realRobot_zmp_x": {
-        "color": "#00ff00",
-        "visible": false,
-        "linewidth": 3.0,
-        "linestyle": "-",
-        "label": "lipm_stabilizer_hrp5_p_realRobot_zmp_x"
-      },
-      "lipm_stabilizer_hrp5_p_support_max_x": {
-        "color": "#aaff00",
-        "visible": false,
-        "linewidth": 1.0,
-        "linestyle": "--",
-        "label": "lipm_stabilizer_hrp5_p_support_max_x"
-      },
-      "lipm_stabilizer_hrp5_p_realRobot_com_x": {
+      "impedance_hrp5_p_LeftHand_filteredMeasuredWrench_fz": {
         "color": "#ff0000",
         "visible": false,
         "linewidth": 3.0,
         "linestyle": "-",
-        "label": "lipm_stabilizer_hrp5_p_realRobot_com_x"
+        "label": "impedance_hrp5_p_LeftHand_filteredMeasuredWrench_fz"
+      },
+      "impedance_hrp5_p_RightHand_filteredMeasuredWrench_fz": {
+        "color": "#0000ff",
+        "visible": false,
+        "linewidth": 3.0,
+        "linestyle": "-",
+        "label": "impedance_hrp5_p_RightHand_filteredMeasuredWrench_fz"
+      },
+      "impedance_hrp5_p_LeftHand_targetWrench_fz": {
+        "color": "#ffaa00",
+        "visible": false,
+        "linewidth": 3.0,
+        "linestyle": "-",
+        "label": "impedance_hrp5_p_LeftHand_targetWrench_fz"
       }
     },
     {},
@@ -85,16 +77,110 @@
     {
       "legend_fontsize": 10,
       "top_offset": 0.9,
-      "y1_legend_ncol": 3,
-      "labelpad": 10,
-      "bottom_offset": 0.1,
       "tick_fontsize": 10,
-      "y2_legend_ncol": 3
+      "labelpad": 10,
+      "y2_legend_ncol": 3,
+      "y1_legend_ncol": 3,
+      "bottom_offset": 0.1
     },
     0
   ],
   [
-    "HandForceTest_ComOffset",
+    "Stabilizer_ComZmpX",
+    "t",
+    [
+      "lipm_stabilizer_hrp5_p_controlRobot_com_x",
+      "lipm_stabilizer_hrp5_p_realRobot_com_x",
+      "lipm_stabilizer_hrp5_p_realRobot_zmp_x",
+      "lipm_stabilizer_hrp5_p_support_max_x",
+      "lipm_stabilizer_hrp5_p_support_min_x"
+    ],
+    [],
+    [],
+    [],
+    {
+      "color": "#000000",
+      "visible": true,
+      "linewidth": 0.5,
+      "linestyle": "--",
+      "label": ""
+    },
+    {
+      "color": "#000000",
+      "visible": true,
+      "linewidth": 0.5,
+      "linestyle": "--",
+      "label": ""
+    },
+    {
+      "lipm_stabilizer_hrp5_p_support_min_x": {
+        "color": "#005500",
+        "visible": false,
+        "linewidth": 1.5,
+        "linestyle": "--",
+        "label": "lipm_stabilizer_hrp5_p_support_min_x"
+      },
+      "lipm_stabilizer_hrp5_p_controlRobot_com_x": {
+        "color": "#0000ff",
+        "visible": false,
+        "linewidth": 3.0,
+        "linestyle": "-",
+        "label": "lipm_stabilizer_hrp5_p_controlRobot_com_x"
+      },
+      "lipm_stabilizer_hrp5_p_realRobot_zmp_x": {
+        "color": "#00ff00",
+        "visible": false,
+        "linewidth": 3.0,
+        "linestyle": "-",
+        "label": "lipm_stabilizer_hrp5_p_realRobot_zmp_x"
+      },
+      "lipm_stabilizer_hrp5_p_realRobot_com_x": {
+        "color": "#ff0000",
+        "visible": false,
+        "linewidth": 3.0,
+        "linestyle": "-",
+        "label": "lipm_stabilizer_hrp5_p_realRobot_com_x"
+      },
+      "lipm_stabilizer_hrp5_p_support_max_x": {
+        "color": "#005500",
+        "visible": false,
+        "linewidth": 1.5,
+        "linestyle": "--",
+        "label": "lipm_stabilizer_hrp5_p_support_max_x"
+      }
+    },
+    {},
+    {
+      "x_label": {
+        "text": "",
+        "fontsize": 10
+      },
+      "y1_label": {
+        "text": "",
+        "fontsize": 10
+      },
+      "y2_label": {
+        "text": "",
+        "fontsize": 10
+      },
+      "title": {
+        "text": "",
+        "fontsize": 12
+      }
+    },
+    {
+      "legend_fontsize": 10,
+      "top_offset": 0.9,
+      "tick_fontsize": 10,
+      "labelpad": 10,
+      "y2_legend_ncol": 3,
+      "y1_legend_ncol": 3,
+      "bottom_offset": 0.1
+    },
+    0
+  ],
+  [
+    "Stabilizer_ComOffsetX",
     "t",
     [
       "lipm_stabilizer_hrp5_p_extWrench_comOffsetMeasured_x",
@@ -104,15 +190,15 @@
     [],
     [],
     {
-      "color": "black",
-      "visible": false,
+      "color": "#000000",
+      "visible": true,
       "linewidth": 0.5,
       "linestyle": "--",
       "label": ""
     },
     {
-      "color": "black",
-      "visible": false,
+      "color": "#000000",
+      "visible": true,
       "linewidth": 0.5,
       "linestyle": "--",
       "label": ""
@@ -164,59 +250,51 @@
     0
   ],
   [
-    "HandForceTest_Fz",
+    "Stabilizer_ComOffsetErrX",
     "t",
     [
-      "HandForceTest_MeasuredWrench_LeftHand_fz",
-      "HandForceTest_MeasuredWrench_RightHand_fz",
-      "HandForceTest_TargetWrench_LeftHand_fz",
-      "HandForceTest_TargetWrench_RightHand_fz"
+      "lipm_stabilizer_hrp5_p_extWrench_comOffsetErr_x",
+      "lipm_stabilizer_hrp5_p_extWrench_comOffsetErr_ZMP_x",
+      "lipm_stabilizer_hrp5_p_extWrench_comOffsetErr_CoM_x"
     ],
     [],
     [],
     [],
     {
-      "color": "black",
-      "visible": false,
+      "color": "#000000",
+      "visible": true,
       "linewidth": 0.5,
       "linestyle": "--",
       "label": ""
     },
     {
-      "color": "black",
-      "visible": false,
+      "color": "#000000",
+      "visible": true,
       "linewidth": 0.5,
       "linestyle": "--",
       "label": ""
     },
     {
-      "HandForceTest_MeasuredWrench_LeftHand_fz": {
-        "color": "#ff0000",
+      "lipm_stabilizer_hrp5_p_extWrench_comOffsetErr_ZMP_x": {
+        "color": "#aa00ff",
         "visible": false,
-        "linewidth": 3.0,
+        "linewidth": 2.0,
         "linestyle": "-",
-        "label": "HandForceTest_MeasuredWrench_LeftHand_fz"
+        "label": "lipm_stabilizer_hrp5_p_extWrench_comOffsetErr_ZMP_x"
       },
-      "HandForceTest_TargetWrench_RightHand_fz": {
-        "color": "#55ffff",
-        "visible": false,
-        "linewidth": 3.0,
-        "linestyle": "-",
-        "label": "HandForceTest_TargetWrench_RightHand_fz"
-      },
-      "HandForceTest_MeasuredWrench_RightHand_fz": {
+      "lipm_stabilizer_hrp5_p_extWrench_comOffsetErr_x": {
         "color": "#0000ff",
         "visible": false,
-        "linewidth": 3.0,
+        "linewidth": 2.0,
         "linestyle": "-",
-        "label": "HandForceTest_MeasuredWrench_RightHand_fz"
+        "label": "lipm_stabilizer_hrp5_p_extWrench_comOffsetErr_x"
       },
-      "HandForceTest_TargetWrench_LeftHand_fz": {
+      "lipm_stabilizer_hrp5_p_extWrench_comOffsetErr_CoM_x": {
         "color": "#ffaa00",
         "visible": false,
-        "linewidth": 3.0,
+        "linewidth": 2.0,
         "linestyle": "-",
-        "label": "HandForceTest_TargetWrench_LeftHand_fz"
+        "label": "lipm_stabilizer_hrp5_p_extWrench_comOffsetErr_CoM_x"
       }
     },
     {},
