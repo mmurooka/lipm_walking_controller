@@ -849,8 +849,8 @@ plans:
             translation: [0.0, 0.105, 0.0]
           surface: LeftFootCenter
     custom_forward:
-      double_support_duration: 0.1
-      single_support_duration: 0.7
+      double_support_duration: 0.4
+      single_support_duration: 0.8
       step_length: 0.2
       swing_height: 0.04
       contacts:
