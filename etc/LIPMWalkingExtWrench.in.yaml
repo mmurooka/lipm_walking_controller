@@ -62,6 +62,9 @@ robot_models:
       pitch: 0.0
     #### Stabilizer Config for HRP5P ####
     stabilizer:
+      # tasks:
+      #   com:
+      #     height: 0.9
       dcm_tracking:
         gains:
           integral: 0.0
@@ -1244,8 +1247,8 @@ StatesLibraries:
 - "@MC_STATES_LIBRARY_INSTALL_PREFIX@"
 Managed: false
 StepByStep: false
-# autoplay: true
-autoplay: false # for real robot
+autoplay: true
+# autoplay: false # for real robot
 init: Initial
 states:
   WalkInternal:
@@ -1327,3 +1330,15 @@ RunStabilizerConfig:
     # impMPos: [10.0, 10.0, 10.0]
     # impDPos: [1000.0, 1500.0, 1500.0]
     # impKPos: [1000.0, 200.0, 200.0]
+    # #### Wheelbarrow ####
+    # ReachType: wall
+    # GraspObj: true
+    # ObjPose:
+    #   pos: [0.5, 0, 0.53]
+    # ObjToHandPoseLeft:
+    #   pos: [0, 0.3, 0]
+    #   rot: [1, 0, 0, 0]
+    # ObjToHandPoseRight:
+    #   pos: [0, -0.3, 0]
+    #   rot: [1, 0, 0, 0]
+    # extWrenchGain: [0, 0, 1]
