@@ -118,9 +118,6 @@ void states::RunStabilizer::start()
         obj_config("impKPos", impKPos);
       }
     }
-    sva::ForceVecd impM(Eigen::Vector3d::Constant(2.0), impMPos);
-    sva::ForceVecd impD(Eigen::Vector3d::Constant(200.0), impDPos);
-    sva::ForceVecd impK(Eigen::Vector3d::Constant(200.0), impKPos);
 
     imp_tasks_.clear();
     for (auto arm : BOTH_ARMS) {
@@ -129,11 +126,13 @@ void states::RunStabilizer::start()
           ctl.robots(),
           ctl.robot().robotIndex());
       imp_tasks_.emplace(arm, imp_task);
-      imp_task->impedance(impM, impD, impK);
+      imp_task->gains().M() = sva::ImpedanceVecd(Eigen::Vector3d::Constant(2.0), impMPos);
+      imp_task->gains().D() = sva::ImpedanceVecd(Eigen::Vector3d::Constant(200.0), impDPos);
+      imp_task->gains().K() = sva::ImpedanceVecd(Eigen::Vector3d::Constant(200.0), impKPos);
       imp_task->reset();
       ctl.solver().addTask(imp_task);
       // temporarily, make the wrench gain of orientation zero
-      imp_task->wrenchGain(sva::MotionVecd(Eigen::Vector3d::Zero(), Eigen::Vector3d::Ones()));
+      imp_task->gains().wrench() = sva::ImpedanceVecd(Eigen::Vector3d::Zero(), Eigen::Vector3d::Ones());
     }
   }
 
@@ -192,7 +191,7 @@ void states::RunStabilizer::runState()
       if (phase_switched_) {
         updateGuiStartReach(ctl);
         for (auto arm : BOTH_ARMS) {
-          imp_tasks_.at(arm)->desiredPose(
+          imp_tasks_.at(arm)->targetPose(
               sva::PTransformd((approach_dist_ * Eigen::Vector3d::UnitZ()).eval()) * target_hand_poses_.at(arm));
         }
         phase_switched_ = false;
@@ -203,7 +202,7 @@ void states::RunStabilizer::runState()
     case Phase::ReachTarget:
       if (phase_switched_) {
         for (auto arm : BOTH_ARMS) {
-          imp_tasks_.at(arm)->desiredPose(target_hand_poses_.at(arm));
+          imp_tasks_.at(arm)->targetPose(target_hand_poses_.at(arm));
         }
         phase_switched_ = false;
       } else if (handReached()) {
@@ -229,13 +228,13 @@ void states::RunStabilizer::runState()
         for (auto arm : BOTH_ARMS) {
           rel_target_hand_poses_.emplace(
               arm,
-              imp_tasks_.at(arm)->desiredPose() * footMidpose(ctl).inv());
+              imp_tasks_.at(arm)->targetPose() * footMidpose(ctl).inv());
         }
         updateGuiStartHold(ctl);
         phase_switched_ = false;
       } else {
         for (auto arm : BOTH_ARMS) {
-          imp_tasks_.at(arm)->desiredPose(rel_target_hand_poses_.at(arm) * footMidpose(ctl));
+          imp_tasks_.at(arm)->targetPose(rel_target_hand_poses_.at(arm) * footMidpose(ctl));
         }
         if (finish_locomanip_) {
           updateGuiFinishHold(ctl);
@@ -258,8 +257,8 @@ void states::RunStabilizer::runState()
     case Phase::ReleaseWayPoint:
       if (phase_switched_) {
         for (auto arm : BOTH_ARMS) {
-          imp_tasks_.at(arm)->desiredPose(
-              sva::PTransformd((approach_dist_ * Eigen::Vector3d::UnitZ()).eval()) * imp_tasks_.at(arm)->desiredPose());
+          imp_tasks_.at(arm)->targetPose(
+              sva::PTransformd((approach_dist_ * Eigen::Vector3d::UnitZ()).eval()) * imp_tasks_.at(arm)->targetPose());
         }
         phase_switched_ = false;
       } else if (handReached(1e-1, 1e-2)) {
@@ -438,18 +437,17 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
           {"M", "D", "K"},
           [this]() {
             return Eigen::Vector3d(
-                imp_tasks_.at(Arm::Left)->impedanceM().force()[0],
-                imp_tasks_.at(Arm::Left)->impedanceD().force()[0],
-                imp_tasks_.at(Arm::Left)->impedanceK().force()[0]);
+                imp_tasks_.at(Arm::Left)->gains().M().linear()[0],
+                imp_tasks_.at(Arm::Left)->gains().D().linear()[0],
+                imp_tasks_.at(Arm::Left)->gains().K().linear()[0]);
           },
           [this](const Eigen::Vector3d& v) {
             for (auto arm : BOTH_ARMS) {
-              imp_tasks_.at(arm)->impedancePosition(
-                  Eigen::Vector3d::Constant(v[0]),
-                  Eigen::Vector3d::Constant(v[1]),
-                  Eigen::Vector3d::Constant(v[2]));
+              imp_tasks_.at(arm)->gains().M().linear().setConstant(v[0]);
+              imp_tasks_.at(arm)->gains().D().linear().setConstant(v[1]);
+              imp_tasks_.at(arm)->gains().K().linear().setConstant(v[2]);
             }
-            mc_rtc::log::info("[RunStabilizer] impedance is changed to {}.",
+            mc_rtc::log::info("[RunStabilizer] impedancePosition is changed to {}.",
                               v.transpose());
           }),
       mc_rtc::gui::ArrayInput(
@@ -457,21 +455,17 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
           {"M", "D", "K"},
           [this]() {
             return Eigen::Vector3d(
-                imp_tasks_.at(Arm::Left)->impedanceM().force()[2],
-                imp_tasks_.at(Arm::Left)->impedanceD().force()[2],
-                imp_tasks_.at(Arm::Left)->impedanceK().force()[2]);
+                imp_tasks_.at(Arm::Left)->gains().M().linear()[2],
+                imp_tasks_.at(Arm::Left)->gains().D().linear()[2],
+                imp_tasks_.at(Arm::Left)->gains().K().linear()[2]);
           },
           [this](const Eigen::Vector3d& v) {
-            Eigen::Vector3d impM = imp_tasks_.at(Arm::Left)->impedanceM().force();
-            Eigen::Vector3d impD = imp_tasks_.at(Arm::Left)->impedanceD().force();
-            Eigen::Vector3d impK = imp_tasks_.at(Arm::Left)->impedanceK().force();
-            impM[2] = v[0];
-            impD[2] = v[1];
-            impK[2] = v[2];
             for (auto arm : BOTH_ARMS) {
-              imp_tasks_.at(arm)->impedancePosition(impM, impD, impK);
+              imp_tasks_.at(arm)->gains().M().linear()[2] = v[0];
+              imp_tasks_.at(arm)->gains().D().linear()[2] = v[1];
+              imp_tasks_.at(arm)->gains().K().linear()[2] = v[2];
             }
-            mc_rtc::log::info("[RunStabilizer] Z-Axis impedance is changed to {}.",
+            mc_rtc::log::info("[RunStabilizer] Z-Axis impedancePosition is changed to {}.",
                               v.transpose());
           }));
 
