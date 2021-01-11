@@ -443,9 +443,9 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
           },
           [this](const Eigen::Vector3d& v) {
             for (auto arm : BOTH_ARMS) {
-              imp_tasks_.at(arm)->gains().M().linear().setConstant(v[0]);
-              imp_tasks_.at(arm)->gains().D().linear().setConstant(v[1]);
-              imp_tasks_.at(arm)->gains().K().linear().setConstant(v[2]);
+              imp_tasks_.at(arm)->gains().M().linear(v[0]);
+              imp_tasks_.at(arm)->gains().D().linear(v[1]);
+              imp_tasks_.at(arm)->gains().K().linear(v[2]);
             }
             mc_rtc::log::info("[RunStabilizer] impedancePosition is changed to {}.",
                               v.transpose());
@@ -461,9 +461,15 @@ void states::RunStabilizer::setupGui(mc_control::fsm::Controller & ctl)
           },
           [this](const Eigen::Vector3d& v) {
             for (auto arm : BOTH_ARMS) {
-              imp_tasks_.at(arm)->gains().M().linear()[2] = v[0];
-              imp_tasks_.at(arm)->gains().D().linear()[2] = v[1];
-              imp_tasks_.at(arm)->gains().K().linear()[2] = v[2];
+              auto M_linear = imp_tasks_.at(arm)->gains().M().linear();
+              auto D_linear = imp_tasks_.at(arm)->gains().D().linear();
+              auto K_linear = imp_tasks_.at(arm)->gains().K().linear();
+              M_linear.z() = v[0];
+              D_linear.z() = v[1];
+              K_linear.z() = v[2];
+              imp_tasks_.at(arm)->gains().M().linear(M_linear);
+              imp_tasks_.at(arm)->gains().D().linear(D_linear);
+              imp_tasks_.at(arm)->gains().K().linear(K_linear);
             }
             mc_rtc::log::info("[RunStabilizer] Z-Axis impedancePosition is changed to {}.",
                               v.transpose());
