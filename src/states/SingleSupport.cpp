@@ -135,8 +135,10 @@ void states::SingleSupport::updateSwingFoot()
     {
       swingFoot_.integrate(dt);
       swingFootTask->target(swingFoot_.pose());
-      swingFootTask->refVelB(swingFoot_.vel());
-      swingFootTask->refAccel(swingFoot_.accel());
+      // T_0_s transforms a MotionVecd variable from world to surface frame
+      sva::PTransformd T_0_s(swingFootTask->surfacePose().rotation());
+      swingFootTask->refVelB(T_0_s * swingFoot_.vel());
+      swingFootTask->refAccel(T_0_s * swingFoot_.accel());
     }
     else
     {
