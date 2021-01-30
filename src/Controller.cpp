@@ -344,11 +344,11 @@ void Controller::internalReset()
   // - Do we still need the posture tricks?
 
   // (1) update floating-base transforms of both robot mbc's
-  auto X_0_fb = supportContact().robotTransform(controlRobot());
-  controlRobot().posW(X_0_fb);
-  controlRobot().velW(sva::MotionVecd::Zero());
-  realRobot().posW(X_0_fb);
-  realRobot().velW(sva::MotionVecd::Zero());
+  // auto X_0_fb = supportContact().robotTransform(controlRobot());
+  // controlRobot().posW(X_0_fb);
+  // controlRobot().velW(sva::MotionVecd::Zero());
+  // realRobot().posW(X_0_fb);
+  // realRobot().velW(sva::MotionVecd::Zero());
 
   // (2) update contact frames to coincide with surface ones
   loadFootstepPlan(plan.name);

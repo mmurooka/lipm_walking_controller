@@ -1082,6 +1082,7 @@ collisions:
   - type: collision
     useMinimal: true
 contacts: []
+init_pos: [0.7071067811865476, 0., 0., -0.7071067811865476, 0, 0., 0.773]
 robots:
   ground:
     module: env/ground
@@ -1118,7 +1119,7 @@ ObserverPipelines:
   gui: true
   observers:
     - type: Encoder
-    - type: Attitude
+#    - type: Attitude # comment out just because I've not installed the Attitude Observer yet.
     - type: KinematicInertial
       config:
         anchorFrame:
